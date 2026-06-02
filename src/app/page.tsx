@@ -48,17 +48,17 @@ export default function Home() {
         setAdminSessions(getAdminSessions());
         router.push(`/session/${id}/admin/${admin_token}`);
       } else {
-        alert("Failed to create session");
+        alert("Failed to create election");
       }
     } catch {
-      alert("Failed to create session");
+      alert("Failed to create election");
     } finally {
       setCreating(false);
     }
   };
 
   const deleteSession = async (session: AdminSession) => {
-    if (!confirm(`Delete "${session.name}"? This removes all nominations and votes permanently.`)) return;
+    if (!confirm(`Delete "${session.name}"? This removes all nominations and votes permanently from this election.`)) return;
     setDeletingId(session.id);
 
     try {
@@ -72,10 +72,10 @@ export default function Home() {
         removeAdminSession(session.id);
         setAdminSessions(getAdminSessions());
       } else {
-        alert("Failed to delete session");
+        alert("Failed to delete election");
       }
     } catch {
-      alert("Failed to delete session");
+      alert("Failed to delete election");
     } finally {
       setDeletingId(null);
     }
@@ -111,7 +111,7 @@ export default function Home() {
             className="w-full py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-semibold text-lg transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            New Session
+            New Election
           </motion.button>
         ) : (
           <motion.div
@@ -119,7 +119,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-5"
           >
-            <h2 className="text-lg font-semibold text-white">Create a Session</h2>
+            <h2 className="text-lg font-semibold text-white">Create an Election</h2>
 
             <input
               type="text"
@@ -166,7 +166,7 @@ export default function Home() {
               ) : (
                 <>
                   <Plus className="w-5 h-5" />
-                  Create Session
+                  Create Election
                 </>
               )}
             </button>
@@ -182,7 +182,7 @@ export default function Home() {
             className="space-y-3"
           >
             <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-              Your Sessions
+              Your Elections
             </h3>
             {adminSessions.map((s) => (
               <div
@@ -221,7 +221,7 @@ export default function Home() {
                   onClick={() => deleteSession(s)}
                   disabled={deletingId === s.id}
                   className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
-                  title="Delete session"
+                  title="Delete election"
                 >
                   {deletingId === s.id ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

@@ -138,8 +138,8 @@ export default function SessionPage({
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-2">Session not found</h1>
-          <p className="text-zinc-400">This voting session doesn&apos;t exist or has been removed.</p>
+          <h1 className="text-2xl font-bold text-white mb-2">Election not found</h1>
+          <p className="text-zinc-400">This election doesn&apos;t exist or has been removed.</p>
         </div>
       </div>
     );

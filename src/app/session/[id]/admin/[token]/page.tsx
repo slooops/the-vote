@@ -22,7 +22,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import NominationList from "@/components/NominationList";
 import ResultsChart from "@/components/ResultsChart";
 import type { Session, Nomination, NominationWithScore } from "@/lib/types";
-import { saveAdminSession } from "@/lib/admin-sessions";
+import { saveAdminSession, getAdminSessions, type AdminSession } from "@/lib/admin-sessions";
 
 export default function AdminPage({
   params,
@@ -41,6 +41,14 @@ export default function AdminPage({
   const [editServices, setEditServices] = useState<string[]>([]);
   const [newService, setNewService] = useState("");
   const [authorized, setAuthorized] = useState(false);
+  const [showSessionSwitcher, setShowSessionSwitcher] = useState(false);
+  const [otherSessions, setOtherSessions] = useState<AdminSession[]>([]);
+
+  // Load other admin sessions for the switcher
+  useEffect(() => {
+    const all = getAdminSessions();
+    setOtherSessions(all.filter((s) => s.id !== id));
+  }, [id]);
 
   const fetchAll = useCallback(async () => {
     const [sessionRes, nomsRes, resultsRes] = await Promise.all([
@@ -112,7 +120,7 @@ export default function AdminPage({
       });
       await fetchAll();
     } catch {
-      alert("Failed to update session");
+      alert("Failed to update election");
     } finally {
       setUpdating(false);
     }
@@ -131,7 +139,7 @@ export default function AdminPage({
       await fetchAll();
       setShowSettings(false);
     } catch {
-      alert("Failed to update services");
+      alert("Failed to update streaming services");
     }
   };
 
@@ -183,6 +191,57 @@ export default function AdminPage({
   return (
     <div className="min-h-screen bg-zinc-950">
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* Session switcher bar */}
+        {otherSessions.length > 0 && (
+          <div>
+            <button
+              onClick={() => setShowSessionSwitcher(!showSessionSwitcher)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <span>{otherSessions.length} other election{otherSessions.length > 1 ? "s" : ""}</span>
+              <span className={`transition-transform ${showSessionSwitcher ? "rotate-180" : ""}`}>▾</span>
+            </button>
+            <AnimatePresence>
+              {showSessionSwitcher && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 space-y-1.5"
+                >
+                  {otherSessions.map((s) => (
+                    <a
+                      key={s.id}
+                      href={`/session/${s.id}/admin/${s.admin_token}`}
+                      className="flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-700/50 rounded-xl transition-colors"
+                    >
+                      <div className="w-8 h-8 bg-zinc-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                        {s.type === "movie" ? (
+                          <Film className="w-4 h-4 text-zinc-400" />
+                        ) : (
+                          <BookOpen className="w-4 h-4 text-zinc-400" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{s.name}</p>
+                        <p className="text-zinc-600 text-xs">{s.type === "movie" ? "Movie Night" : "Book Club"}</p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-zinc-600" />
+                    </a>
+                  ))}
+                  <a
+                    href="/"
+                    className="flex items-center justify-center gap-2 p-2 text-xs text-zinc-500 hover:text-violet-400 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    New Election
+                  </a>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -252,7 +311,7 @@ export default function AdminPage({
         {/* Status controls */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
           <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-            Session Controls
+            Election Controls
           </h3>
 
           {/* Progress bar */}
