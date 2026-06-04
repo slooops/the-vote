@@ -28,7 +28,7 @@ export async function PATCH(
   const { id } = await params;
   const sql = getDb();
   const body = await req.json();
-  const { admin_token, status, streaming_services, name } = body;
+  const { admin_token, status, streaming_services, name, max_nominations } = body;
 
   // Verify admin
   const rows = await sql(`SELECT * FROM tv_sessions WHERE id = $1`, [id]);
@@ -54,6 +54,10 @@ export async function PATCH(
   if (name) {
     updates.push(`name = $${paramIndex++}`);
     values.push(name);
+  }
+  if (max_nominations !== undefined) {
+    updates.push(`max_nominations = $${paramIndex++}`);
+    values.push(max_nominations);
   }
 
   updates.push(`updated_at = NOW()`);

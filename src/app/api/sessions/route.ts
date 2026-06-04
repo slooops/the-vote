@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 export async function POST(req: NextRequest) {
   const sql = getDb();
   const body = await req.json();
-  const { name, type, streaming_services } = body;
+  const { name, type, streaming_services, max_nominations } = body;
 
   if (!name || !type || !["movie", "book"].includes(type)) {
     return NextResponse.json({ error: "Invalid session data" }, { status: 400 });
@@ -21,10 +21,12 @@ export async function POST(req: NextRequest) {
     "Peacock",
   ];
 
+  const maxNoms = max_nominations || 1;
+
   await sql(
-    `INSERT INTO tv_sessions (id, name, type, admin_token, streaming_services)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [id, name, type, admin_token, JSON.stringify(services)]
+    `INSERT INTO tv_sessions (id, name, type, admin_token, streaming_services, max_nominations)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [id, name, type, admin_token, JSON.stringify(services), maxNoms]
   );
 
   return NextResponse.json({ id, admin_token });

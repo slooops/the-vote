@@ -35,13 +35,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nominations are closed" }, { status: 400 });
   }
 
-  // Check if user already nominated — if so, delete old one first (allows changing)
+  // Check nomination count vs max_nominations
+  const maxNoms = session[0].max_nominations || 1;
   const existing = await sql(
     `SELECT * FROM tv_nominations WHERE session_id = $1 AND nominated_by_token = $2`,
     [session_id, voter_token]
   );
-  if (existing.length > 0) {
-    await sql(`DELETE FROM tv_nominations WHERE id = $1`, [existing[0].id]);
+
+  // If replacing (single-nom mode or explicit replace via replace_id)
+  const replaceId = body.replace_id;
+  if (replaceId) {
+    await sql(`DELETE FROM tv_nominations WHERE id = $1 AND nominated_by_token = $2`, [replaceId, voter_token]);
+  } else if (existing.length >= maxNoms) {
+    // 0 = unlimited
+    if (maxNoms !== 0) {
+      return NextResponse.json(
+        { error: `You've already used all ${maxNoms} nomination${maxNoms > 1 ? "s" : ""}`, existing: existing[0] },
+        { status: 409 }
+      );
+    }
   }
 
   const id = nanoid(10);

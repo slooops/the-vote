@@ -112,6 +112,7 @@ export default function NominationDetailModal({
           availability,
           voter_token: voterToken,
           voter_name: voterName,
+          replace_id: nomination.id,
         }),
       });
 
@@ -270,26 +271,26 @@ export default function NominationDetailModal({
                   exit={{ opacity: 0 }}
                   className="space-y-3"
                 >
-                  {/* Search input — same height as button */}
+                  {/* Search input — full width to prevent iOS Safari zoom */}
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && searchMovies()}
+                      placeholder={session.type === "movie" ? "Search new movie..." : "Search new book..."}
+                      className="w-full h-[50px] pl-12 pr-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-base placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      autoFocus
+                    />
+                  </div>
                   <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                      <input
-                        type="text"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && searchMovies()}
-                        placeholder={session.type === "movie" ? "Search new movie..." : "Search new book..."}
-                        className="w-full h-[50px] pl-10 pr-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        autoFocus
-                      />
-                    </div>
                     <button
                       onClick={searchMovies}
                       disabled={searching || !query.trim()}
-                      className="h-[50px] px-4 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 text-white rounded-xl transition-colors"
+                      className="flex-1 h-[44px] bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 text-white rounded-xl transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                     >
-                      {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Search className="w-4 h-4" /> Search</>}
                     </button>
                     <button
                       onClick={() => {
@@ -297,9 +298,9 @@ export default function NominationDetailModal({
                         setQuery("");
                         setResults([]);
                       }}
-                      className="h-[50px] px-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 rounded-xl transition-colors"
+                      className="h-[44px] px-4 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 rounded-xl transition-colors text-sm"
                     >
-                      <X className="w-4 h-4" />
+                      Cancel
                     </button>
                   </div>
 

@@ -32,7 +32,7 @@ export default function SessionPage({
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
-  const [hasNominated, setHasNominated] = useState(false);
+  const [myNominationCount, setMyNominationCount] = useState(0);
   const [detailNomination, setDetailNomination] = useState<Nomination | null>(null);
 
   const fetchSession = useCallback(async () => {
@@ -50,7 +50,7 @@ export default function SessionPage({
       setNominations(data);
       const user = getUser();
       if (user) {
-        setHasNominated(data.some((n: Nomination) => n.nominated_by_token === user.token));
+        setMyNominationCount(data.filter((n: Nomination) => n.nominated_by_token === user.token).length);
       }
     }
   }, [id]);
@@ -212,51 +212,64 @@ export default function SessionPage({
         )}
 
         {/* Nominations phase */}
-        {session.status === "nominations_open" && userToken && (
-          <>
-            {!hasNominated ? (
-              <>
-                <NominationList
-                  nominations={nominations}
-                  sessionType={session.type}
-                  currentUserToken={userToken}
-                  onNominationClick={handleNominationClick}
-                />
+        {session.status === "nominations_open" && userToken && (() => {
+          const maxNoms = session.max_nominations ?? 1;
+          const hasSlots = maxNoms === 0 || myNominationCount < maxNoms;
+          const nomLabel = maxNoms === 1
+            ? "Your Nomination"
+            : maxNoms === 0
+            ? `Your Nominations (${myNominationCount})`
+            : `Your Nominations (${myNominationCount}/${maxNoms})`;
+
+          return (
+            <>
+              {/* Status banner */}
+              {myNominationCount > 0 && !hasSlots && (
+                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
+                  <p className="text-green-400 font-medium">
+                    ✓ You&apos;ve used {myNominationCount === 1 ? "your nomination" : `all ${myNominationCount} nominations`}!
+                  </p>
+                  <p className="text-zinc-400 text-sm mt-1">
+                    Tap a nomination to view details or change it.
+                  </p>
+                </div>
+              )}
+              {myNominationCount > 0 && hasSlots && (
+                <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-4 text-center">
+                  <p className="text-violet-400 font-medium">
+                    {maxNoms === 0
+                      ? `You've nominated ${myNominationCount} so far — add more anytime!`
+                      : `${maxNoms - myNominationCount} nomination${maxNoms - myNominationCount > 1 ? "s" : ""} remaining`}
+                  </p>
+                </div>
+              )}
+
+              <NominationList
+                nominations={nominations}
+                sessionType={session.type}
+                currentUserToken={userToken}
+                onNominationClick={handleNominationClick}
+              />
+
+              {/* Search for new nomination — show if slots available */}
+              {hasSlots && (
                 <div className="border-t border-zinc-800 pt-6">
                   <h2 className="text-lg font-semibold text-white mb-4">
-                    Your Nomination
+                    {nomLabel}
                   </h2>
                   <SearchNominate
                     session={session}
                     voterToken={userToken}
                     voterName={userName}
                     onNominated={() => {
-                      setHasNominated(true);
                       fetchNominations();
                     }}
                   />
                 </div>
-              </>
-            ) : (
-              <>
-                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center">
-                  <p className="text-green-400 font-medium">
-                    ✓ You&apos;ve submitted your nomination!
-                  </p>
-                  <p className="text-zinc-400 text-sm mt-1">
-                    Tap your nomination to view details or change it.
-                  </p>
-                </div>
-                <NominationList
-                  nominations={nominations}
-                  sessionType={session.type}
-                  currentUserToken={userToken}
-                  onNominationClick={handleNominationClick}
-                />
-              </>
-            )}
-          </>
-        )}
+              )}
+            </>
+          );
+        })()}
 
         {/* Nominations closed — waiting */}
         {session.status === "nominations_closed" && (

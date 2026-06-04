@@ -9,6 +9,7 @@ export interface Session {
     | "voting_closed";
   admin_token: string;
   streaming_services: string[];
+  max_nominations: number;
   created_at: string;
   updated_at: string;
 }

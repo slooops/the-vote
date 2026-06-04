@@ -40,6 +40,7 @@ export default function AdminPage({
   const [showSettings, setShowSettings] = useState(false);
   const [editServices, setEditServices] = useState<string[]>([]);
   const [newService, setNewService] = useState("");
+  const [editMaxNoms, setEditMaxNoms] = useState(1);
   const [authorized, setAuthorized] = useState(false);
   const [showSessionSwitcher, setShowSessionSwitcher] = useState(false);
   const [otherSessions, setOtherSessions] = useState<AdminSession[]>([]);
@@ -64,6 +65,7 @@ export default function AdminPage({
         ? s.streaming_services
         : JSON.parse(s.streaming_services);
       setEditServices(services);
+      setEditMaxNoms(s.max_nominations ?? 1);
     }
     if (nomsRes.ok) setNominations(await nomsRes.json());
     if (resultsRes.ok) {
@@ -126,7 +128,7 @@ export default function AdminPage({
     }
   };
 
-  const updateServices = async () => {
+  const saveSettings = async () => {
     try {
       await fetch(`/api/sessions/${id}`, {
         method: "PATCH",
@@ -134,12 +136,13 @@ export default function AdminPage({
         body: JSON.stringify({
           admin_token: token,
           streaming_services: editServices,
+          max_nominations: editMaxNoms,
         }),
       });
       await fetchAll();
       setShowSettings(false);
     } catch {
-      alert("Failed to update streaming services");
+      alert("Failed to save settings");
     }
   };
 
@@ -358,65 +361,100 @@ export default function AdminPage({
 
         {/* Settings panel */}
         <AnimatePresence>
-          {showSettings && session.type === "movie" && (
+          {showSettings && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-3"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-5"
             >
-              <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-                Streaming Services
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {editServices.map((s) => (
-                  <span
-                    key={s}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300"
-                  >
-                    {s}
+              {/* Max nominations */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                  Nominations Per Person
+                </h3>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 0].map((n) => (
                     <button
-                      onClick={() =>
-                        setEditServices(editServices.filter((x) => x !== s))
-                      }
-                      className="text-zinc-500 hover:text-red-400"
+                      key={n}
+                      onClick={() => setEditMaxNoms(n)}
+                      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        editMaxNoms === n
+                          ? "bg-violet-600 text-white ring-2 ring-violet-400"
+                          : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                      }`}
                     >
-                      <X className="w-3 h-3" />
+                      {n === 0 ? "∞" : n}
                     </button>
-                  </span>
-                ))}
+                  ))}
+                </div>
+                <p className="text-zinc-600 text-xs">
+                  {editMaxNoms === 0
+                    ? "Unlimited — everyone can nominate as many as they want"
+                    : editMaxNoms === 1
+                    ? "Each person gets 1 nomination"
+                    : `Each person gets up to ${editMaxNoms} nominations`}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newService}
-                  onChange={(e) => setNewService(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newService.trim()) {
-                      setEditServices([...editServices, newService.trim()]);
-                      setNewService("");
-                    }
-                  }}
-                  placeholder="Add service..."
-                  className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-                <button
-                  onClick={() => {
-                    if (newService.trim()) {
-                      setEditServices([...editServices, newService.trim()]);
-                      setNewService("");
-                    }
-                  }}
-                  className="px-3 py-2 bg-violet-600 text-white rounded-lg"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
+
+              {/* Streaming services (movies only) */}
+              {session.type === "movie" && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                    Streaming Services
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {editServices.map((s) => (
+                      <span
+                        key={s}
+                        className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300"
+                      >
+                        {s}
+                        <button
+                          onClick={() =>
+                            setEditServices(editServices.filter((x) => x !== s))
+                          }
+                          className="text-zinc-500 hover:text-red-400"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newService}
+                      onChange={(e) => setNewService(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newService.trim()) {
+                          setEditServices([...editServices, newService.trim()]);
+                          setNewService("");
+                        }
+                      }}
+                      placeholder="Add service..."
+                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <button
+                      onClick={() => {
+                        if (newService.trim()) {
+                          setEditServices([...editServices, newService.trim()]);
+                          setNewService("");
+                        }
+                      }}
+                      className="px-3 py-2 bg-violet-600 text-white rounded-lg"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
-                onClick={updateServices}
+                onClick={saveSettings}
                 className="w-full py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium"
               >
-                Save Services
+                Save Settings
               </button>
             </motion.div>
           )}
