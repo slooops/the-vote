@@ -66,13 +66,38 @@ export async function GET(req: NextRequest) {
 
     const allServices: StreamingService[] = [...flatrate, ...free, ...rent];
 
-    // Determine availability status relative to wanted services
-    const matchesService = (providerName: string) =>
-      wantedServices.some(
-        (ws) =>
-          providerName.toLowerCase().includes(ws.toLowerCase()) ||
-          ws.toLowerCase().includes(providerName.toLowerCase())
-      );
+    // Normalize names for matching — TMDB uses "Disney Plus", users say "Disney+"
+    const ALIASES: Record<string, string[]> = {
+      "disney+": ["disney plus", "disney+"],
+      "apple tv+": ["apple tv plus", "apple tv+", "apple tv"],
+      "prime video": ["amazon video", "prime video", "amazon prime"],
+      "peacock": ["peacock", "peacock premium", "peacock free"],
+      "hulu": ["hulu"],
+      "netflix": ["netflix"],
+      "hbo max": ["hbo max", "max", "max amazon channel"],
+      "paramount+": ["paramount plus", "paramount+", "paramount plus premium", "paramount plus essential"],
+    };
+
+    const normalize = (name: string) => name.toLowerCase().trim();
+
+    const matchesService = (providerName: string) => {
+      const pn = normalize(providerName);
+      return wantedServices.some((ws) => {
+        const wn = normalize(ws);
+        // Direct match
+        if (pn.includes(wn) || wn.includes(pn)) return true;
+        // Check aliases — if the wanted service has known aliases, check against those
+        const aliases = ALIASES[wn];
+        if (aliases) return aliases.some((a) => pn.includes(a) || a.includes(pn));
+        // Check reverse — if the provider name has known aliases
+        for (const [key, vals] of Object.entries(ALIASES)) {
+          if (vals.some((v) => pn.includes(v) || v.includes(pn))) {
+            if (key === wn || wn.includes(key) || key.includes(wn)) return true;
+          }
+        }
+        return false;
+      });
+    };
 
     const freeOnWanted = [...flatrate, ...free].filter((s) => matchesService(s.name));
     const rentOnWanted = rent.filter((s) => matchesService(s.name));

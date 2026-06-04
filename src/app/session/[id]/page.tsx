@@ -33,7 +33,6 @@ export default function SessionPage({
   const [userToken, setUserToken] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [hasNominated, setHasNominated] = useState(false);
-  const [isChangingNomination, setIsChangingNomination] = useState(false);
   const [detailNomination, setDetailNomination] = useState<Nomination | null>(null);
 
   const fetchSession = useCallback(async () => {
@@ -116,12 +115,6 @@ export default function SessionPage({
     setShowWelcome(false);
   };
 
-  const handleChangeNomination = () => {
-    setDetailNomination(null);
-    setIsChangingNomination(true);
-    setHasNominated(false);
-  };
-
   const handleNominationClick = (nom: Nomination) => {
     setDetailNomination(nom);
   };
@@ -165,16 +158,18 @@ export default function SessionPage({
 
       {/* Nomination detail modal */}
       <AnimatePresence>
-        {detailNomination && (
+        {detailNomination && userToken && (
           <NominationDetailModal
             nomination={detailNomination}
-            sessionType={session.type}
+            session={session}
             isOwn={detailNomination.nominated_by_token === userToken}
+            voterToken={userToken}
+            voterName={userName}
             onClose={() => setDetailNomination(null)}
-            onChangeNomination={
+            onNominationChanged={
               session.status === "nominations_open" &&
               detailNomination.nominated_by_token === userToken
-                ? handleChangeNomination
+                ? () => fetchNominations()
                 : undefined
             }
           />
@@ -229,16 +224,14 @@ export default function SessionPage({
                 />
                 <div className="border-t border-zinc-800 pt-6">
                   <h2 className="text-lg font-semibold text-white mb-4">
-                    {isChangingNomination ? "Change Your Nomination" : "Your Nomination"}
+                    Your Nomination
                   </h2>
                   <SearchNominate
                     session={session}
                     voterToken={userToken}
                     voterName={userName}
-                    isChanging={isChangingNomination}
                     onNominated={() => {
                       setHasNominated(true);
-                      setIsChangingNomination(false);
                       fetchNominations();
                     }}
                   />
