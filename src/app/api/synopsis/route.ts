@@ -5,6 +5,29 @@ import { nanoid } from "nanoid";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
+// Gemini occasionally returns transient errors — 503 (model overloaded /
+// "high demand"), 429 (burst rate limit), or a 5xx. Retry those a couple of
+// times with exponential backoff before giving up. Non-transient errors
+// (bad key, hard quota, malformed request) fail fast on the first attempt.
+type GenParams = Parameters<typeof genai.models.generateContent>[0];
+async function generateWithRetry(params: GenParams, attempts = 3) {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await genai.models.generateContent(params);
+    } catch (error) {
+      lastError = error;
+      const status = (error as { status?: number })?.status;
+      const transient =
+        status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+      if (!transient || i === attempts - 1) throw error;
+      // Backoff: 500ms, 1000ms, ...
+      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** i));
+    }
+  }
+  throw lastError;
+}
+
 // POST /api/synopsis - Generate or correct a synopsis via Gemini
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -58,7 +81,7 @@ Respond in JSON format: { "synopsis": "...", "author": "..." }`;
   }
 
   try {
-    const response = await genai.models.generateContent({
+    const response = await generateWithRetry({
       model: "gemini-flash-latest",
       contents: prompt,
       config: {
