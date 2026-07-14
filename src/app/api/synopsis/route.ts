@@ -59,7 +59,7 @@ Respond in JSON format: { "synopsis": "...", "author": "..." }`;
 
   try {
     const response = await genai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-flash-latest",
       contents: prompt,
       config: {
         responseMimeType: "application/json",

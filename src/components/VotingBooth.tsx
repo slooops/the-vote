@@ -186,13 +186,22 @@ export default function VotingBooth({
             {nominations.map((nom) => {
               const currentTier = getTierForNom(nom.id);
               return (
-                <motion.button
+                <motion.div
                   key={nom.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     selectForTier(selectingTier, nom.id);
                     setSelectingTier(null);
                   }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selectForTier(selectingTier, nom.id);
+                      setSelectingTier(null);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left cursor-pointer ${
                     currentTier
                       ? "bg-zinc-800/30 border-zinc-600 opacity-60"
                       : "bg-zinc-800/50 border-zinc-700/50 hover:border-violet-500/50"
@@ -248,7 +257,7 @@ export default function VotingBooth({
                       {currentTier}
                     </span>
                   )}
-                </motion.button>
+                </motion.div>
               );
             })}
           </motion.div>

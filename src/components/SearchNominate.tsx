@@ -423,7 +423,7 @@ export default function SearchNominate({
                 </div>
               ) : (
                 <p className="text-zinc-300 text-sm leading-relaxed">
-                  {synopsis || "No synopsis available. Click the chat icon to generate one."}
+                  {synopsis || "No synopsis available — you can still nominate, or use the edit or chat icons to add one."}
                 </p>
               )}
 
@@ -484,7 +484,7 @@ export default function SearchNominate({
               {/* Submit nomination */}
               <button
                 onClick={submitNomination}
-                disabled={submitting || !synopsis}
+                disabled={submitting || loadingSynopsis}
                 className="w-full py-4 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-xl font-semibold text-lg transition-colors flex items-center justify-center gap-2 mt-4"
               >
                 {submitting ? (
