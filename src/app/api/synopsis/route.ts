@@ -5,24 +5,45 @@ import { nanoid } from "nanoid";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
-// Gemini occasionally returns transient errors — 503 (model overloaded /
-// "high demand"), 429 (burst rate limit), or a 5xx. Retry those a couple of
-// times with exponential backoff before giving up. Non-transient errors
-// (bad key, hard quota, malformed request) fail fast on the first attempt.
+// Gemini's free tier is volatile: individual models get their daily quota
+// zeroed (gemini-2.0-flash), capped low (gemini-3.5-flash at 20/day), or
+// deprecated (404) with little notice, and the "-latest" aliases rotate onto
+// whichever model is newest (and often stingiest on free quota). Each model
+// has its OWN per-day free quota, so the robust approach is a fallback chain:
+// try a preferred model, and on a quota (429) or availability (404) error,
+// fall through to the next. "lite" models come first — they carry the most
+// generous free limits and are plenty for a 2-3 sentence synopsis.
+const SYNOPSIS_MODELS = [
+  "gemini-flash-lite-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-flash-latest",
+];
+
+const isTransient = (status?: number) =>
+  status === 500 || status === 502 || status === 503 || status === 504;
+
+// A quota/availability error means THIS model is unusable right now — move on
+// to the next model rather than retrying the same one.
+const shouldTryNextModel = (status?: number) => status === 429 || status === 404;
+
 type GenParams = Parameters<typeof genai.models.generateContent>[0];
-async function generateWithRetry(params: GenParams, attempts = 3) {
+async function generateSynopsis(params: Omit<GenParams, "model">) {
   let lastError: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await genai.models.generateContent(params);
-    } catch (error) {
-      lastError = error;
-      const status = (error as { status?: number })?.status;
-      const transient =
-        status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
-      if (!transient || i === attempts - 1) throw error;
-      // Backoff: 500ms, 1000ms, ...
-      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** i));
+  for (const model of SYNOPSIS_MODELS) {
+    // Up to 2 attempts per model, to ride out a transient overload blip.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await genai.models.generateContent({ ...params, model });
+      } catch (error) {
+        lastError = error;
+        const status = (error as { status?: number })?.status;
+        if (isTransient(status) && attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          continue; // retry same model once
+        }
+        if (shouldTryNextModel(status) || isTransient(status)) break; // next model
+        throw error; // non-recoverable (bad key, malformed request): fail fast
+      }
     }
   }
   throw lastError;
@@ -81,8 +102,7 @@ Respond in JSON format: { "synopsis": "...", "author": "..." }`;
   }
 
   try {
-    const response = await generateWithRetry({
-      model: "gemini-flash-latest",
+    const response = await generateSynopsis({
       contents: prompt,
       config: {
         responseMimeType: "application/json",
