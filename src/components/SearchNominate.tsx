@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Search, Loader2, Film, BookOpen, MessageCircle, Send, Check, Undo2, Edit3 } from "lucide-react";
+import { Search, Loader2, Film, BookOpen, MessageCircle, Send, Check, Undo2, Edit3, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SearchResult, Session } from "@/lib/types";
 import Image from "next/image";
@@ -46,6 +46,10 @@ export default function SearchNominate({
   const [rentOn, setRentOn] = useState<string[]>([]);
   const [availability, setAvailability] = useState<"free" | "rent" | "unavailable">("unavailable");
   const [loadingStreaming, setLoadingStreaming] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualAuthor, setManualAuthor] = useState("");
+  const [manualYear, setManualYear] = useState("");
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -119,6 +123,42 @@ export default function SearchNominate({
         setLoadingStreaming(false);
       }
     }
+  };
+
+  const startManualEntry = () => {
+    setManualTitle(query.trim());
+    setManualAuthor("");
+    setManualYear("");
+    setManualMode(true);
+  };
+
+  // Build a search-result-shaped object from the manual fields and drop into
+  // the preview screen. Unlike selectResult, we DON'T auto-generate a synopsis:
+  // a manually-added item isn't in any catalog, so Gemini would just stall
+  // (30s+) and hallucinate. Open the editor instead so the user can type their
+  // own synopsis (or leave it blank), with the chat icon still available if
+  // they want to try generating one. No tmdb_id/openlibrary_key => no
+  // poster/streaming lookup, as expected for an off-catalog pick.
+  const continueManual = () => {
+    if (!manualTitle.trim()) return;
+    const manualResult: SearchResult = {
+      id: `manual-${manualTitle.trim()}`,
+      title: manualTitle.trim(),
+      year: manualYear.trim(),
+      poster_url: null,
+      synopsis: "",
+      author: session.type === "book" ? manualAuthor.trim() || undefined : undefined,
+    };
+    setManualMode(false);
+    setSelected(manualResult);
+    setSynopsis("");
+    setAuthor(manualResult.author || "");
+    setChatMessages([]);
+    setShowChat(false);
+    setEditing(true);
+    setFreeOn([]);
+    setRentOn([]);
+    setAvailability("unavailable");
   };
 
   const sendChatMessage = async () => {
@@ -297,6 +337,70 @@ export default function SearchNominate({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Manual add — for items that don't show up in search */}
+      {!selected && (
+        !manualMode ? (
+          <button
+            onClick={startManualEntry}
+            className="w-full text-zinc-500 hover:text-violet-400 text-sm flex items-center justify-center gap-1.5 py-2 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Can&apos;t find your {session.type}? Add it manually
+          </button>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-zinc-800/50 border border-zinc-700 rounded-2xl p-5 space-y-3"
+          >
+            <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+              Add {session.type === "movie" ? "a movie" : "a book"} manually
+            </h4>
+            <input
+              type="text"
+              value={manualTitle}
+              onChange={(e) => setManualTitle(e.target.value)}
+              placeholder="Title (required)"
+              className="w-full p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              autoFocus
+            />
+            {session.type === "book" && (
+              <input
+                type="text"
+                value={manualAuthor}
+                onChange={(e) => setManualAuthor(e.target.value)}
+                placeholder="Author (optional)"
+                className="w-full p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            )}
+            <input
+              type="text"
+              value={manualYear}
+              onChange={(e) => setManualYear(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && continueManual()}
+              placeholder="Year (optional)"
+              inputMode="numeric"
+              className="w-full p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={continueManual}
+                disabled={!manualTitle.trim()}
+                className="flex-1 py-3 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-xl font-medium text-sm transition-colors"
+              >
+                Continue
+              </button>
+              <button
+                onClick={() => setManualMode(false)}
+                className="px-4 py-3 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 rounded-xl text-sm transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )
+      )}
 
       {/* Selected item detail */}
       <AnimatePresence>
