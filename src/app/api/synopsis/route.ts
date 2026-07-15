@@ -49,10 +49,49 @@ async function generateSynopsis(params: Omit<GenParams, "model">) {
   throw lastError;
 }
 
-// POST /api/synopsis - Generate or correct a synopsis via Gemini
+// Open Library descriptions carry markdown-ish footnotes and source citations
+// after a horizontal rule; the real blurb is the leading paragraph(s). Strip
+// the cruft and cap the length so it reads like a synopsis, not a data dump.
+function cleanOpenLibraryDescription(raw: string): string {
+  let text = raw
+    .replace(/\r/g, "")
+    .split(/\n-{3,}/)[0] // drop everything after a "----" separator (source/footnotes)
+    .replace(/^\s*\[\d+\]:\s*\S+.*$/gm, "") // markdown link-reference definitions
+    .replace(/\(\[[^\]]*\]\[\d+\]\)/g, "") // inline "([source][1])" citations
+    .trim();
+
+  const MAX = 600;
+  if (text.length > MAX) {
+    const cut = text.slice(0, MAX);
+    const lastStop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+    text = lastStop > 200 ? cut.slice(0, lastStop + 1) : cut.trimEnd() + "…";
+  }
+  return text.trim();
+}
+
+// Fetch a book's own description from Open Library (free, no Gemini quota).
+// Returns null when OL has no usable description, so the caller falls back to Gemini.
+async function fetchOpenLibraryDescription(openlibraryKey: string): Promise<string | null> {
+  if (!/^\/works\/[A-Za-z0-9]+$/.test(openlibraryKey)) return null; // guard the URL
+  try {
+    const res = await fetch(`https://openlibrary.org${openlibraryKey}.json`, {
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const raw = typeof data.description === "string" ? data.description : data.description?.value;
+    if (!raw || typeof raw !== "string") return null;
+    const cleaned = cleanOpenLibraryDescription(raw);
+    return cleaned.length >= 40 ? cleaned : null; // ignore stubs / one-liners
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/synopsis - Get a synopsis (Open Library for books, else Gemini)
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { title, type, author, year, user_message, conversation_history } = body;
+  const { title, type, author, year, openlibrary_key, user_message, conversation_history } = body;
 
   if (!title) {
     return NextResponse.json({ error: "Title required" }, { status: 400 });
@@ -72,6 +111,28 @@ export async function POST(req: NextRequest) {
         synopsis: cached[0].synopsis,
         author: cached[0].author,
         cached: true,
+      });
+    }
+  }
+
+  // For books, prefer Open Library's own description — it's free and spends no
+  // Gemini quota. Only fall through to Gemini when OL has nothing usable.
+  if (!user_message && type === "book" && openlibrary_key) {
+    const olDescription = await fetchOpenLibraryDescription(openlibrary_key);
+    if (olDescription) {
+      const cacheKey = `${type}:${title}:${author || ""}`.toLowerCase();
+      try {
+        await sql(
+          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author) VALUES ($1, $2, $3, $4) ON CONFLICT (lookup_key) DO NOTHING`,
+          [nanoid(10), cacheKey, olDescription, author || null]
+        );
+      } catch {
+        // Cache write failure is non-critical
+      }
+      return NextResponse.json({
+        synopsis: olDescription,
+        author: author || undefined,
+        source: "openlibrary",
       });
     }
   }

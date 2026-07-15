@@ -83,6 +83,7 @@ export default function SearchNominate({
             type: session.type,
             author: result.author,
             year: result.year,
+            openlibrary_key: result.openlibrary_key,
           }),
         });
         const data = await res.json();
