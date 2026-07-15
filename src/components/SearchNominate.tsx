@@ -13,6 +13,8 @@ interface SearchNominateProps {
   voterName: string;
   onNominated: () => void;
   isChanging?: boolean;
+  /** When changing an existing pick, the id of the nomination to replace. */
+  replaceId?: string;
 }
 
 interface ChatMessage {
@@ -26,6 +28,7 @@ export default function SearchNominate({
   voterName,
   onNominated,
   isChanging,
+  replaceId,
 }: SearchNominateProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -183,6 +186,7 @@ export default function SearchNominate({
           availability,
           voter_token: voterToken,
           voter_name: voterName,
+          replace_id: replaceId,
         }),
       });
 
