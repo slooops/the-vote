@@ -310,7 +310,11 @@ export default function SessionPage({
             {/* Live results */}
             {results.length > 0 && (
               <div className="border-t border-zinc-800 pt-6">
-                <ResultsChart results={results} totalVotes={totalVotes} />
+                <ResultsChart
+                  results={results}
+                  totalVotes={totalVotes}
+                  onNominationClick={handleNominationClick}
+                />
               </div>
             )}
           </>
@@ -318,7 +322,12 @@ export default function SessionPage({
 
         {/* Final results */}
         {session.status === "voting_closed" && (
-          <ResultsChart results={results} totalVotes={totalVotes} isFinal />
+          <ResultsChart
+            results={results}
+            totalVotes={totalVotes}
+            isFinal
+            onNominationClick={handleNominationClick}
+          />
         )}
       </div>
     </div>

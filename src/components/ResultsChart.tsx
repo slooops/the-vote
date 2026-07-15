@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type KeyboardEvent } from "react";
 import { Trophy, Medal, Award, Crown } from "lucide-react";
 import { motion } from "framer-motion";
 import type { NominationWithScore } from "@/lib/types";
@@ -10,9 +10,10 @@ interface ResultsChartProps {
   results: NominationWithScore[];
   totalVotes: number;
   isFinal?: boolean;
+  onNominationClick?: (nomination: NominationWithScore) => void;
 }
 
-export default function ResultsChart({ results, totalVotes, isFinal }: ResultsChartProps) {
+export default function ResultsChart({ results, totalVotes, isFinal, onNominationClick }: ResultsChartProps) {
   const maxScore = useMemo(
     () => Math.max(...results.map((r) => r.score), 1),
     [results]
@@ -45,7 +46,22 @@ export default function ResultsChart({ results, totalVotes, isFinal }: ResultsCh
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.08 }}
+            {...(onNominationClick
+              ? {
+                  role: "button",
+                  tabIndex: 0,
+                  onClick: () => onNominationClick(result),
+                  onKeyDown: (e: KeyboardEvent) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onNominationClick(result);
+                    }
+                  },
+                }
+              : {})}
             className={`rounded-xl overflow-hidden ${
+              onNominationClick ? "cursor-pointer hover:brightness-125 transition-[filter]" : ""
+            } ${
               isWinner
                 ? "bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30"
                 : "bg-zinc-800/30 border border-zinc-700/50"
@@ -84,6 +100,7 @@ export default function ResultsChart({ results, totalVotes, isFinal }: ResultsCh
                 <p className="text-zinc-500 text-xs">
                   {result.year}
                   {result.author ? ` · ${result.author}` : ""}
+                  {result.pages ? ` · ${result.pages} pages` : ""}
                 </p>
 
                 {/* Score bar */}

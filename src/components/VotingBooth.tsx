@@ -239,6 +239,7 @@ export default function VotingBooth({
                     <p className="text-zinc-500 text-xs">
                       {nom.year}
                       {nom.author ? ` · ${nom.author}` : ""}
+                      {nom.pages ? ` · ${nom.pages} pages` : ""}
                     </p>
                   </div>
                   {onNominationClick && (

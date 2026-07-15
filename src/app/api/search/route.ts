@@ -52,7 +52,7 @@ async function searchMovies(query: string) {
 
 async function searchBooks(query: string) {
   const res = await fetch(
-    `${OL_BASE}/search.json?q=${encodeURIComponent(query)}&limit=8&fields=key,title,author_name,cover_i,first_publish_year`
+    `${OL_BASE}/search.json?q=${encodeURIComponent(query)}&limit=8&fields=key,title,author_name,cover_i,first_publish_year,number_of_pages_median`
   );
 
   if (!res.ok) {
@@ -61,7 +61,7 @@ async function searchBooks(query: string) {
 
   const data = await res.json();
   const results = data.docs.slice(0, 8).map(
-    (b: { key: string; title: string; author_name?: string[]; cover_i?: number; first_publish_year?: number }) => ({
+    (b: { key: string; title: string; author_name?: string[]; cover_i?: number; first_publish_year?: number; number_of_pages_median?: number }) => ({
       id: `ol-${b.key}`,
       title: b.title,
       year: b.first_publish_year ? String(b.first_publish_year) : "",
@@ -71,6 +71,7 @@ async function searchBooks(query: string) {
       synopsis: "",
       author: b.author_name?.[0] || "Unknown Author",
       openlibrary_key: b.key,
+      pages: b.number_of_pages_median || undefined,
     })
   );
 

@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
     year,
     tmdb_id,
     openlibrary_key,
+    pages,
     streaming_availability,
     streaming_rent,
     availability,
@@ -58,11 +59,12 @@ export async function POST(req: NextRequest) {
 
   const id = nanoid(10);
   await sql(
-    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, streaming_availability, streaming_rent, availability, nominated_by_token, nominated_by_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, pages, streaming_availability, streaming_rent, availability, nominated_by_token, nominated_by_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       id, session_id, title, poster_url || null, synopsis || null,
       author || null, year || null, tmdb_id || null, openlibrary_key || null,
+      pages || null,
       JSON.stringify(streaming_availability || []),
       JSON.stringify(streaming_rent || []),
       availability || "unavailable",

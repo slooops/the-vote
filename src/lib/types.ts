@@ -24,6 +24,7 @@ export interface Nomination {
   year: string | null;
   tmdb_id: number | null;
   openlibrary_key: string | null;
+  pages: number | null;
   streaming_availability: string[];
   streaming_rent: string[];
   availability: "free" | "rent" | "unavailable";
@@ -76,4 +77,5 @@ export interface SearchResult {
   author?: string;
   tmdb_id?: number;
   openlibrary_key?: string;
+  pages?: number;
 }

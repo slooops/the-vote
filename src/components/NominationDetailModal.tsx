@@ -76,6 +76,7 @@ export default function NominationDetailModal({
                   <p className="text-zinc-400 text-sm mt-1">
                     {nomination.year}
                     {nomination.author ? ` · ${nomination.author}` : ""}
+                    {nomination.pages ? ` · ${nomination.pages} pages` : ""}
                   </p>
                 </div>
               </div>
@@ -95,6 +96,7 @@ export default function NominationDetailModal({
                   <p className="text-zinc-400 text-sm mt-1">
                     {nomination.year}
                     {nomination.author ? ` · ${nomination.author}` : ""}
+                    {nomination.pages ? ` · ${nomination.pages} pages` : ""}
                   </p>
                 </div>
               </div>

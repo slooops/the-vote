@@ -50,6 +50,7 @@ export default function SearchNominate({
   const [manualTitle, setManualTitle] = useState("");
   const [manualAuthor, setManualAuthor] = useState("");
   const [manualYear, setManualYear] = useState("");
+  const [manualPages, setManualPages] = useState("");
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -129,6 +130,7 @@ export default function SearchNominate({
     setManualTitle(query.trim());
     setManualAuthor("");
     setManualYear("");
+    setManualPages("");
     setManualMode(true);
   };
 
@@ -141,6 +143,7 @@ export default function SearchNominate({
   // poster/streaming lookup, as expected for an off-catalog pick.
   const continueManual = () => {
     if (!manualTitle.trim()) return;
+    const parsedPages = parseInt(manualPages.trim(), 10);
     const manualResult: SearchResult = {
       id: `manual-${manualTitle.trim()}`,
       title: manualTitle.trim(),
@@ -148,6 +151,7 @@ export default function SearchNominate({
       poster_url: null,
       synopsis: "",
       author: session.type === "book" ? manualAuthor.trim() || undefined : undefined,
+      pages: session.type === "book" && Number.isFinite(parsedPages) && parsedPages > 0 ? parsedPages : undefined,
     };
     setManualMode(false);
     setSelected(manualResult);
@@ -221,6 +225,7 @@ export default function SearchNominate({
           year: selected.year,
           tmdb_id: selected.tmdb_id,
           openlibrary_key: selected.openlibrary_key,
+          pages: selected.pages,
           streaming_availability: freeOn,
           streaming_rent: rentOn,
           availability,
@@ -374,15 +379,28 @@ export default function SearchNominate({
                 className="w-full p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
               />
             )}
-            <input
-              type="text"
-              value={manualYear}
-              onChange={(e) => setManualYear(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && continueManual()}
-              placeholder="Year (optional)"
-              inputMode="numeric"
-              className="w-full p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualYear}
+                onChange={(e) => setManualYear(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && continueManual()}
+                placeholder="Year (optional)"
+                inputMode="numeric"
+                className="flex-1 p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              {session.type === "book" && (
+                <input
+                  type="text"
+                  value={manualPages}
+                  onChange={(e) => setManualPages(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && continueManual()}
+                  placeholder="Pages (optional)"
+                  inputMode="numeric"
+                  className="flex-1 p-3 bg-zinc-900 border border-zinc-600 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              )}
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={continueManual}
@@ -434,6 +452,7 @@ export default function SearchNominate({
                 <p className="text-zinc-400 text-sm mt-1">
                   {selected.year}
                   {author ? ` · ${author}` : ""}
+                  {selected.pages ? ` · ${selected.pages} pages` : ""}
                 </p>
 
                 {/* Availability badge */}

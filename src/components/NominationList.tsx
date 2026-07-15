@@ -75,6 +75,7 @@ export default function NominationList({
             <p className="text-zinc-400 text-sm">
               {nom.year}
               {nom.author ? ` · ${nom.author}` : ""}
+              {nom.pages ? ` · ${nom.pages} pages` : ""}
             </p>
             {nom.synopsis && (
               <p className="text-zinc-500 text-xs mt-1 line-clamp-2">
