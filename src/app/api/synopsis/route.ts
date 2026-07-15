@@ -7,19 +7,15 @@ const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
 // Gemini's free tier is volatile: individual models get their daily quota
 // zeroed (gemini-2.0-flash), capped low (gemini-3.5-flash at 20/day), or
-// deprecated (404) with little notice, and the "-latest" aliases rotate onto
-// whichever model is newest (and often stingiest on free quota). Each model
-// has its OWN per-day free quota, so the robust approach is a fallback chain:
-// try a preferred model, and on a quota (429) or availability (404) error,
-// fall through to the next. "lite" models come first — they carry the most
-// generous free limits and are plenty for a 2-3 sentence synopsis.
-// Pinned to gemini-3.1-flash-lite as the primary: it currently carries the
-// most generous free quota (500 requests/day vs 20 for the flash models), and
-// pinning it explicitly guarantees we use it rather than whatever the rotating
-// "-latest" alias happens to resolve to. The aliases stay as fallbacks; if
-// 3.1-flash-lite is ever retired, revisit and re-pin (or lead with -latest).
+// deprecated (404) with little notice. Each model has its OWN per-day free
+// quota, so we use a fallback chain: try the preferred model, and on a quota
+// (429) or availability (404) error, fall through to the next.
+//
+// We track the "-latest" aliases so the model stays current as Google rotates
+// them (a pinned version eventually gets retired). Lite comes first — it
+// carries the most generous free limits and is plenty for a 2-3 sentence
+// synopsis; full flash is the fallback.
 const SYNOPSIS_MODELS = [
-  "gemini-3.1-flash-lite",
   "gemini-flash-lite-latest",
   "gemini-flash-latest",
 ];
