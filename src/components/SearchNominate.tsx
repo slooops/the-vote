@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Search, Loader2, Film, BookOpen, MessageCircle, Send, Check, X, Edit3 } from "lucide-react";
+import { Search, Loader2, Film, BookOpen, MessageCircle, Send, Check, Undo2, Edit3 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SearchResult, Session } from "@/lib/types";
 import Image from "next/image";
@@ -362,13 +362,10 @@ export default function SearchNominate({
                 )}
 
                 <button
-                  onClick={() => {
-                    setSelected(null);
-                    setResults([]);
-                  }}
+                  onClick={() => setSelected(null)}
                   className="mt-3 text-zinc-500 hover:text-zinc-300 text-sm flex items-center gap-1"
                 >
-                  <X className="w-3 h-3" /> Pick something else
+                  <Undo2 className="w-3 h-3" /> Back to results
                 </button>
               </div>
             </div>
