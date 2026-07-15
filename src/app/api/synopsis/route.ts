@@ -13,9 +13,14 @@ const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 // try a preferred model, and on a quota (429) or availability (404) error,
 // fall through to the next. "lite" models come first — they carry the most
 // generous free limits and are plenty for a 2-3 sentence synopsis.
+// Pinned to gemini-3.1-flash-lite as the primary: it currently carries the
+// most generous free quota (500 requests/day vs 20 for the flash models), and
+// pinning it explicitly guarantees we use it rather than whatever the rotating
+// "-latest" alias happens to resolve to. The aliases stay as fallbacks; if
+// 3.1-flash-lite is ever retired, revisit and re-pin (or lead with -latest).
 const SYNOPSIS_MODELS = [
-  "gemini-flash-lite-latest",
   "gemini-3.1-flash-lite",
+  "gemini-flash-lite-latest",
   "gemini-flash-latest",
 ];
 
