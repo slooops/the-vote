@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Nomination, Session } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
+import TagChip from "./TagChip";
 import SearchNominate from "./SearchNominate";
 
 interface NominationDetailModalProps {
@@ -35,6 +36,9 @@ export default function NominationDetailModal({
   const streamingRent = Array.isArray(nomination.streaming_rent)
     ? nomination.streaming_rent
     : JSON.parse((nomination.streaming_rent as unknown as string) || "[]");
+  const tags = Array.isArray(nomination.tags)
+    ? nomination.tags
+    : JSON.parse((nomination.tags as unknown as string) || "[]");
 
   return (
     <motion.div
@@ -113,6 +117,15 @@ export default function NominationDetailModal({
 
         {/* Content */}
         <div className="p-5 space-y-5">
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {tags.map((t: string) => (
+                <TagChip key={t} tag={t} size="md" />
+              ))}
+            </div>
+          )}
+
           {/* Availability */}
           {session.type === "movie" && (
             <div className="space-y-2">

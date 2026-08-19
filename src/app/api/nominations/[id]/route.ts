@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { validateTags } from "@/lib/tags";
 
 // DELETE /api/nominations/[id] - Delete a nomination (admin or nominator)
 export async function DELETE(
@@ -37,7 +38,7 @@ export async function PATCH(
   const { id } = await params;
   const sql = getDb();
   const body = await req.json();
-  const { voter_token, synopsis, author, poster_url, streaming_availability, streaming_rent, availability } = body;
+  const { voter_token, synopsis, author, poster_url, streaming_availability, streaming_rent, availability, tags } = body;
 
   const nom = await sql(`SELECT * FROM tv_nominations WHERE id = $1`, [id]);
   if (nom.length === 0) {
@@ -45,6 +46,13 @@ export async function PATCH(
   }
   if (nom[0].nominated_by_token !== voter_token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  if (tags !== undefined) {
+    const tagsCheck = validateTags(tags);
+    if (!tagsCheck.valid) {
+      return NextResponse.json({ error: tagsCheck.error }, { status: 400 });
+    }
   }
 
   const updates: string[] = [];
@@ -63,6 +71,7 @@ export async function PATCH(
     values.push(JSON.stringify(streaming_rent));
   }
   if (availability !== undefined) { updates.push(`availability = $${i++}`); values.push(availability); }
+  if (tags !== undefined) { updates.push(`tags = $${i++}`); values.push(JSON.stringify(tags)); }
 
   if (updates.length > 0) {
     values.push(id);

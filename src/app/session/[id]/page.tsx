@@ -15,7 +15,7 @@ import {
   generateToken,
   markWelcomeSeen,
 } from "@/lib/user";
-import type { Session, Nomination, Vote, NominationWithScore } from "@/lib/types";
+import type { Session, Nomination, Vote, RankedResult, IRVRound } from "@/lib/types";
 
 export default function SessionPage({
   params,
@@ -26,8 +26,10 @@ export default function SessionPage({
   const [session, setSession] = useState<Session | null>(null);
   const [nominations, setNominations] = useState<Nomination[]>([]);
   const [myVote, setMyVote] = useState<Vote | null>(null);
-  const [results, setResults] = useState<NominationWithScore[]>([]);
+  const [results, setResults] = useState<RankedResult[]>([]);
+  const [rounds, setRounds] = useState<IRVRound[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
+  const [exhaustedFinal, setExhaustedFinal] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState<string | null>(null);
@@ -72,7 +74,9 @@ export default function SessionPage({
     if (res.ok) {
       const data = await res.json();
       setResults(data.results);
+      setRounds(data.rounds);
       setTotalVotes(data.total_votes);
+      setExhaustedFinal(data.exhausted_final);
     }
   }, [id]);
 
@@ -312,7 +316,9 @@ export default function SessionPage({
               <div className="border-t border-zinc-800 pt-6">
                 <ResultsChart
                   results={results}
+                  rounds={rounds}
                   totalVotes={totalVotes}
+                  exhaustedFinal={exhaustedFinal}
                   onNominationClick={handleNominationClick}
                 />
               </div>
@@ -324,7 +330,9 @@ export default function SessionPage({
         {session.status === "voting_closed" && (
           <ResultsChart
             results={results}
+            rounds={rounds}
             totalVotes={totalVotes}
+            exhaustedFinal={exhaustedFinal}
             isFinal
             onNominationClick={handleNominationClick}
           />

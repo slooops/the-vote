@@ -28,6 +28,7 @@ export interface Nomination {
   streaming_availability: string[];
   streaming_rent: string[];
   availability: "free" | "rent" | "unavailable";
+  tags: string[];
   nominated_by_token: string;
   nominated_by_name: string;
   created_at: string;
@@ -38,18 +39,27 @@ export interface Vote {
   session_id: string;
   voter_token: string;
   voter_name: string;
-  gold_nomination_id: string | null;
-  silver_nomination_id: string | null;
-  bronze_nomination_id: string | null;
+  rankings: string[];
   created_at: string;
   updated_at: string;
 }
 
-export interface NominationWithScore extends Nomination {
-  score: number;
-  gold_count: number;
-  silver_count: number;
-  bronze_count: number;
+export interface IRVRoundTally {
+  nomination_id: string;
+  votes: number;
+}
+
+export interface IRVRound {
+  round: number;
+  tallies: IRVRoundTally[];
+  eliminated: string | null;
+  exhausted_count: number;
+}
+
+export interface RankedResult extends Nomination {
+  rank: number;
+  first_round_votes: number;
+  eliminated_round: number | null;
 }
 
 export interface TMDBMovie {

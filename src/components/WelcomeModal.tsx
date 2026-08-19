@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Medal, Award, Sparkles } from "lucide-react";
+import { ListOrdered, SkipForward, Sparkles } from "lucide-react";
 
 interface WelcomeModalProps {
   onComplete: (nickname: string) => void;
@@ -31,34 +31,30 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
       content: (
         <div className="space-y-5">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
-              <Trophy className="w-6 h-6 text-yellow-400" />
+            <div className="w-12 h-12 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+              <ListOrdered className="w-6 h-6 text-violet-400" />
             </div>
             <div>
-              <p className="text-yellow-400 font-semibold">Gold Pick — 3 points</p>
-              <p className="text-zinc-400 text-sm">Your #1 choice</p>
+              <p className="text-violet-400 font-semibold">Rank as many as you want</p>
+              <p className="text-zinc-400 text-sm">
+                Drag your favorites into order — Gold, Silver, Bronze for your top 3, then keep going.
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-zinc-400/20 flex items-center justify-center flex-shrink-0">
-              <Medal className="w-6 h-6 text-zinc-300" />
+            <div className="w-12 h-12 rounded-full bg-zinc-700/50 flex items-center justify-center flex-shrink-0">
+              <SkipForward className="w-6 h-6 text-zinc-400" />
             </div>
             <div>
-              <p className="text-zinc-300 font-semibold">Silver Pick — 2 points</p>
-              <p className="text-zinc-400 text-sm">Your runner-up</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-700/20 flex items-center justify-center flex-shrink-0">
-              <Award className="w-6 h-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-amber-600 font-semibold">Bronze Pick — 1 point</p>
-              <p className="text-zinc-400 text-sm">Honorable mention</p>
+              <p className="text-zinc-300 font-semibold">Skip anything you don&apos;t want</p>
+              <p className="text-zinc-400 text-sm">
+                Don&apos;t have an opinion on something? Leave it in &quot;Not Ranking.&quot;
+              </p>
             </div>
           </div>
           <p className="text-zinc-500 text-sm mt-4">
-            If there are only 2 options, you&apos;ll pick Gold and Silver only.
+            This is real ranked-choice voting: if your top pick can&apos;t win, your vote moves to your
+            next choice, round by round, until something has a majority.
           </p>
           <div className="bg-zinc-800/50 rounded-lg p-3 mt-2">
             <p className="text-zinc-400 text-xs">

@@ -1,21 +1,42 @@
 "use client";
 
-import { useMemo, type KeyboardEvent } from "react";
-import { Trophy, Medal, Award, Crown } from "lucide-react";
-import { motion } from "framer-motion";
-import type { NominationWithScore } from "@/lib/types";
+import { useMemo, useState, type KeyboardEvent } from "react";
+import { Medal, Award, Crown, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import type { RankedResult, IRVRound } from "@/lib/types";
 import Image from "next/image";
 
 interface ResultsChartProps {
-  results: NominationWithScore[];
+  results: RankedResult[];
+  rounds: IRVRound[];
   totalVotes: number;
+  exhaustedFinal: number;
   isFinal?: boolean;
-  onNominationClick?: (nomination: NominationWithScore) => void;
+  onNominationClick?: (nomination: RankedResult) => void;
 }
 
-export default function ResultsChart({ results, totalVotes, isFinal, onNominationClick }: ResultsChartProps) {
-  const maxScore = useMemo(
-    () => Math.max(...results.map((r) => r.score), 1),
+const MEDALS = [
+  null, // rank 1 gets the Crown/winner treatment instead
+  { icon: Medal, text: "text-zinc-300" },
+  { icon: Award, text: "text-amber-600" },
+] as const;
+
+export default function ResultsChart({
+  results,
+  rounds,
+  totalVotes,
+  exhaustedFinal,
+  isFinal,
+  onNominationClick,
+}: ResultsChartProps) {
+  const [showRounds, setShowRounds] = useState(false);
+
+  const maxVotes = useMemo(
+    () => Math.max(...results.map((r) => r.first_round_votes), 1),
+    [results]
+  );
+  const titleById = useMemo(
+    () => Object.fromEntries(results.map((r) => [r.id, r.title])),
     [results]
   );
 
@@ -37,8 +58,20 @@ export default function ResultsChart({ results, totalVotes, isFinal, onNominatio
       </div>
 
       {results.map((result, i) => {
-        const barWidth = maxScore > 0 ? (result.score / maxScore) * 100 : 0;
-        const isWinner = isFinal && i === 0 && result.score > 0;
+        const barWidth = maxVotes > 0 ? (result.first_round_votes / maxVotes) * 100 : 0;
+        const isWinner = totalVotes > 0 && result.rank === 1;
+        const medal = MEDALS[i];
+
+        const caption =
+          totalVotes === 0
+            ? null
+            : isWinner
+            ? rounds.length === 1
+              ? "Instant winner"
+              : `Won in round ${rounds.length}`
+            : result.eliminated_round
+            ? `Eliminated in round ${result.eliminated_round}`
+            : null;
 
         return (
           <motion.div
@@ -72,10 +105,10 @@ export default function ResultsChart({ results, totalVotes, isFinal, onNominatio
               <div className="w-8 text-center flex-shrink-0">
                 {isWinner ? (
                   <Crown className="w-6 h-6 text-yellow-400 mx-auto" />
+                ) : medal ? (
+                  <medal.icon className={`w-5 h-5 mx-auto ${medal.text}`} />
                 ) : (
-                  <span className="text-zinc-500 font-bold text-lg">
-                    {i + 1}
-                  </span>
+                  <span className="text-zinc-500 font-bold text-lg">{result.rank}</span>
                 )}
               </div>
 
@@ -103,53 +136,102 @@ export default function ResultsChart({ results, totalVotes, isFinal, onNominatio
                   {result.pages ? ` · ${result.pages} pages` : ""}
                 </p>
 
-                {/* Score bar */}
+                {/* First-round vote bar */}
                 <div className="mt-2 flex items-center gap-2">
                   <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
                     <motion.div
                       className={`h-full rounded-full ${
-                        isWinner
-                          ? "bg-gradient-to-r from-yellow-500 to-amber-400"
-                          : "bg-violet-500"
+                        isWinner ? "bg-gradient-to-r from-yellow-500 to-amber-400" : "bg-violet-500"
                       }`}
                       initial={{ width: 0 }}
                       animate={{ width: `${barWidth}%` }}
                       transition={{ duration: 0.8, delay: i * 0.1 }}
                     />
                   </div>
-                  <span className={`text-sm font-bold min-w-[2rem] text-right ${
-                    isWinner ? "text-yellow-400" : "text-violet-400"
-                  }`}>
-                    {result.score}
+                  <span
+                    className={`text-sm font-bold min-w-[2rem] text-right ${
+                      isWinner ? "text-yellow-400" : "text-violet-400"
+                    }`}
+                  >
+                    {result.first_round_votes}
                   </span>
                 </div>
 
-                {/* Medal breakdown */}
-                <div className="flex gap-3 mt-1.5">
-                  {result.gold_count > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-yellow-400">
-                      <Trophy className="w-3 h-3" />
-                      {result.gold_count}
-                    </span>
-                  )}
-                  {result.silver_count > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-zinc-300">
-                      <Medal className="w-3 h-3" />
-                      {result.silver_count}
-                    </span>
-                  )}
-                  {result.bronze_count > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-amber-600">
-                      <Award className="w-3 h-3" />
-                      {result.bronze_count}
-                    </span>
-                  )}
-                </div>
+                {caption && <p className="text-zinc-500 text-xs mt-1">{caption}</p>}
               </div>
             </div>
           </motion.div>
         );
       })}
+
+      {rounds.length > 0 && (
+        <div className="pt-2">
+          <button
+            onClick={() => setShowRounds(!showRounds)}
+            className="w-full flex items-center justify-between text-sm font-medium text-zinc-400 uppercase tracking-wider py-2"
+          >
+            <span>Round-by-round elimination ({rounds.length} round{rounds.length !== 1 ? "s" : ""})</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${showRounds ? "rotate-180" : ""}`} />
+          </button>
+
+          <AnimatePresence>
+            {showRounds && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-4 overflow-hidden"
+              >
+                {rounds.map((round) => {
+                  const roundMax = Math.max(...round.tallies.map((t) => t.votes), 1);
+                  return (
+                    <div
+                      key={round.round}
+                      className="bg-zinc-800/30 border border-zinc-700/50 rounded-xl p-4 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-zinc-300">Round {round.round}</p>
+                        {round.exhausted_count > 0 && (
+                          <p className="text-zinc-600 text-xs">
+                            {round.exhausted_count} ballot{round.exhausted_count !== 1 ? "s" : ""} exhausted
+                          </p>
+                        )}
+                      </div>
+                      {round.tallies.map((t) => {
+                        const isEliminated = t.nomination_id === round.eliminated;
+                        const width = roundMax > 0 ? (t.votes / roundMax) * 100 : 0;
+                        return (
+                          <div key={t.nomination_id} className="flex items-center gap-2">
+                            <p
+                              className={`text-xs w-28 truncate flex-shrink-0 ${
+                                isEliminated ? "text-red-400/70 line-through" : "text-zinc-400"
+                              }`}
+                            >
+                              {titleById[t.nomination_id] || "Unknown"}
+                            </p>
+                            <div className="flex-1 h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full ${isEliminated ? "bg-red-500/50" : "bg-violet-500/70"}`}
+                                style={{ width: `${width}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-zinc-500 w-6 text-right">{t.votes}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+                {exhaustedFinal > 0 && (
+                  <p className="text-zinc-600 text-xs text-center">
+                    {exhaustedFinal} ballot{exhaustedFinal !== 1 ? "s" : ""} exhausted by the final round
+                  </p>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

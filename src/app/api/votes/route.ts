@@ -2,21 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { nanoid } from "nanoid";
 
-// POST /api/votes - Submit or update votes (upsert)
+// POST /api/votes - Submit or update a ranked ballot (upsert)
 export async function POST(req: NextRequest) {
   const sql = getDb();
   const body = await req.json();
-  const {
-    session_id,
-    voter_token,
-    voter_name,
-    gold_nomination_id,
-    silver_nomination_id,
-    bronze_nomination_id,
-  } = body;
+  const { session_id, voter_token, voter_name, rankings } = body;
 
   if (!session_id || !voter_token || !voter_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  if (!Array.isArray(rankings) || rankings.some((r) => typeof r !== "string")) {
+    return NextResponse.json({ error: "rankings must be an array of nomination ids" }, { status: 400 });
+  }
+  if (rankings.length === 0) {
+    return NextResponse.json({ error: "Rank at least one nomination" }, { status: 400 });
+  }
+  if (new Set(rankings).size !== rankings.length) {
+    return NextResponse.json({ error: "Cannot rank the same nomination twice" }, { status: 400 });
   }
 
   // Check session is accepting votes
@@ -28,10 +31,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Voting is not open" }, { status: 400 });
   }
 
-  // Validate no duplicate picks
-  const picks = [gold_nomination_id, silver_nomination_id, bronze_nomination_id].filter(Boolean);
-  if (new Set(picks).size !== picks.length) {
-    return NextResponse.json({ error: "Cannot vote for the same item twice" }, { status: 400 });
+  // Validate every ranked id actually belongs to this session
+  const noms = await sql(`SELECT id FROM tv_nominations WHERE session_id = $1`, [session_id]);
+  const validIds = new Set(noms.map((n: Record<string, unknown>) => n.id as string));
+  if (rankings.some((nomId: string) => !validIds.has(nomId))) {
+    return NextResponse.json({ error: "Unknown nomination in rankings" }, { status: 400 });
   }
 
   // Upsert vote
@@ -42,23 +46,23 @@ export async function POST(req: NextRequest) {
 
   if (existing.length > 0) {
     await sql(
-      `UPDATE tv_votes SET gold_nomination_id = $1, silver_nomination_id = $2, bronze_nomination_id = $3, voter_name = $4, updated_at = NOW()
-       WHERE session_id = $5 AND voter_token = $6`,
-      [gold_nomination_id || null, silver_nomination_id || null, bronze_nomination_id || null, voter_name, session_id, voter_token]
+      `UPDATE tv_votes SET rankings = $1, voter_name = $2, updated_at = NOW()
+       WHERE session_id = $3 AND voter_token = $4`,
+      [JSON.stringify(rankings), voter_name, session_id, voter_token]
     );
   } else {
     const id = nanoid(10);
     await sql(
-      `INSERT INTO tv_votes (id, session_id, voter_token, voter_name, gold_nomination_id, silver_nomination_id, bronze_nomination_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [id, session_id, voter_token, voter_name, gold_nomination_id || null, silver_nomination_id || null, bronze_nomination_id || null]
+      `INSERT INTO tv_votes (id, session_id, voter_token, voter_name, rankings)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, session_id, voter_token, voter_name, JSON.stringify(rankings)]
     );
   }
 
   return NextResponse.json({ success: true });
 }
 
-// GET /api/votes?session_id=xxx&voter_token=yyy - Get user's votes
+// GET /api/votes?session_id=xxx&voter_token=yyy - Get user's vote
 export async function GET(req: NextRequest) {
   const sql = getDb();
   const sessionId = req.nextUrl.searchParams.get("session_id");

@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import type { Nomination } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
+import TagChip from "./TagChip";
 
 interface NominationListProps {
   nominations: Nomination[];
@@ -77,6 +78,13 @@ export default function NominationList({
               {nom.author ? ` · ${nom.author}` : ""}
               {nom.pages ? ` · ${nom.pages} pages` : ""}
             </p>
+            {nom.tags?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {nom.tags.map((t) => (
+                  <TagChip key={t} tag={t} size="sm" />
+                ))}
+              </div>
+            )}
             {nom.synopsis && (
               <p className="text-zinc-500 text-xs mt-1 line-clamp-2">
                 {nom.synopsis}

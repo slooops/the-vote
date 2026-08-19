@@ -21,7 +21,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import NominationList from "@/components/NominationList";
 import ResultsChart from "@/components/ResultsChart";
-import type { Session, Nomination, NominationWithScore } from "@/lib/types";
+import type { Session, Nomination, RankedResult, IRVRound } from "@/lib/types";
 import { saveAdminSession, getAdminSessions, type AdminSession } from "@/lib/admin-sessions";
 
 export default function AdminPage({
@@ -32,8 +32,10 @@ export default function AdminPage({
   const { id, token } = use(params);
   const [session, setSession] = useState<Session | null>(null);
   const [nominations, setNominations] = useState<Nomination[]>([]);
-  const [results, setResults] = useState<NominationWithScore[]>([]);
+  const [results, setResults] = useState<RankedResult[]>([]);
+  const [rounds, setRounds] = useState<IRVRound[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
+  const [exhaustedFinal, setExhaustedFinal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -71,7 +73,9 @@ export default function AdminPage({
     if (resultsRes.ok) {
       const r = await resultsRes.json();
       setResults(r.results);
+      setRounds(r.rounds);
       setTotalVotes(r.total_votes);
+      setExhaustedFinal(r.exhausted_final);
     }
   }, [id]);
 
@@ -498,7 +502,9 @@ export default function AdminPage({
         {results.length > 0 && (
           <ResultsChart
             results={results}
+            rounds={rounds}
             totalVotes={totalVotes}
+            exhaustedFinal={exhaustedFinal}
             isFinal={session.status === "voting_closed"}
           />
         )}

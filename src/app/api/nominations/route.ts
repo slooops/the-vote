@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { validateTags } from "@/lib/tags";
 
 // POST /api/nominations - Create a nomination
 export async function POST(req: NextRequest) {
@@ -19,12 +20,18 @@ export async function POST(req: NextRequest) {
     streaming_availability,
     streaming_rent,
     availability,
+    tags,
     voter_token,
     voter_name,
   } = body;
 
   if (!session_id || !title || !voter_token || !voter_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  const tagsCheck = validateTags(tags);
+  if (!tagsCheck.valid) {
+    return NextResponse.json({ error: tagsCheck.error }, { status: 400 });
   }
 
   // Check session is accepting nominations
@@ -59,8 +66,8 @@ export async function POST(req: NextRequest) {
 
   const id = nanoid(10);
   await sql(
-    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, pages, streaming_availability, streaming_rent, availability, nominated_by_token, nominated_by_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, pages, streaming_availability, streaming_rent, availability, tags, nominated_by_token, nominated_by_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
     [
       id, session_id, title, poster_url || null, synopsis || null,
       author || null, year || null, tmdb_id || null, openlibrary_key || null,
@@ -68,6 +75,7 @@ export async function POST(req: NextRequest) {
       JSON.stringify(streaming_availability || []),
       JSON.stringify(streaming_rent || []),
       availability || "unavailable",
+      JSON.stringify(tags),
       voter_token, voter_name,
     ]
   );

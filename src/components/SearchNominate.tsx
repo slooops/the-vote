@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { SearchResult, Session } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
+import { TAG_CATEGORIES, validateTags } from "@/lib/tags";
 
 interface SearchNominateProps {
   session: Session;
@@ -51,6 +52,12 @@ export default function SearchNominate({
   const [manualAuthor, setManualAuthor] = useState("");
   const [manualYear, setManualYear] = useState("");
   const [manualPages, setManualPages] = useState("");
+  const [tagMood, setTagMood] = useState<string | null>(null);
+  const [tagType, setTagType] = useState<string | null>(null);
+  const [tagGenres, setTagGenres] = useState<string[]>([]);
+
+  const selectedTags = [tagMood, tagType, ...tagGenres].filter(Boolean) as string[];
+  const tagsValid = validateTags(selectedTags).valid;
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -78,6 +85,9 @@ export default function SearchNominate({
     setFreeOn([]);
     setRentOn([]);
     setAvailability("unavailable");
+    setTagMood(null);
+    setTagType(null);
+    setTagGenres([]);
 
     // Fetch synopsis from Gemini if not available
     if (!result.synopsis) {
@@ -163,6 +173,9 @@ export default function SearchNominate({
     setFreeOn([]);
     setRentOn([]);
     setAvailability("unavailable");
+    setTagMood(null);
+    setTagType(null);
+    setTagGenres([]);
   };
 
   const sendChatMessage = async () => {
@@ -229,6 +242,7 @@ export default function SearchNominate({
           streaming_availability: freeOn,
           streaming_rent: rentOn,
           availability,
+          tags: selectedTags,
           voter_token: voterToken,
           voter_name: voterName,
           replace_id: replaceId,
@@ -498,6 +512,64 @@ export default function SearchNominate({
               </div>
             </div>
 
+            {/* Tags */}
+            <div className="px-5 pb-5 space-y-4 border-t border-zinc-700/50 pt-4">
+              {(["mood", "type"] as const).map((cat) => (
+                <div key={cat}>
+                  <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                    {TAG_CATEGORIES[cat].label}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {TAG_CATEGORIES[cat].options.map((opt) => {
+                      const active = cat === "mood" ? tagMood === opt : tagType === opt;
+                      return (
+                        <button
+                          key={opt}
+                          onClick={() => (cat === "mood" ? setTagMood(opt) : setTagType(opt))}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            active
+                              ? "bg-violet-600 text-white ring-2 ring-violet-400"
+                              : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <div>
+                <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                  Genre <span className="normal-case text-zinc-600">(up to 3)</span>
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {TAG_CATEGORIES.genre.options.map((opt) => {
+                    const active = tagGenres.includes(opt);
+                    const disabled = !active && tagGenres.length >= 3;
+                    return (
+                      <button
+                        key={opt}
+                        disabled={disabled}
+                        onClick={() =>
+                          setTagGenres(active ? tagGenres.filter((g) => g !== opt) : [...tagGenres, opt])
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-violet-600 text-white ring-2 ring-violet-400"
+                            : disabled
+                            ? "bg-zinc-800/50 text-zinc-600 cursor-not-allowed"
+                            : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
             {/* Synopsis section */}
             <div className="px-5 pb-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -609,7 +681,7 @@ export default function SearchNominate({
               {/* Submit nomination */}
               <button
                 onClick={submitNomination}
-                disabled={submitting || loadingSynopsis}
+                disabled={submitting || loadingSynopsis || !tagsValid}
                 className="w-full py-4 bg-violet-600 hover:bg-violet-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-xl font-semibold text-lg transition-colors flex items-center justify-center gap-2 mt-4"
               >
                 {submitting ? (
@@ -621,6 +693,11 @@ export default function SearchNominate({
                   </>
                 )}
               </button>
+              {!tagsValid && (
+                <p className="text-zinc-500 text-xs text-center">
+                  Pick a mood, a type, and 1-3 genres to nominate
+                </p>
+              )}
             </div>
           </motion.div>
         )}
