@@ -6,10 +6,22 @@ import { nanoid } from "nanoid";
 export async function POST(req: NextRequest) {
   const sql = getDb();
   const body = await req.json();
-  const { session_id, voter_token, voter_name, rankings } = body;
+  const { session_id, voter_token, voter_name } = body;
 
   if (!session_id || !voter_token || !voter_name) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  // Accept legacy gold/silver/bronze ballots from clients still running a
+  // cached pre-ranked-choice bundle: a 3-tier pick IS an ordered partial
+  // ranking, so convert it rather than rejecting a real vote mid-election.
+  let rankings = body.rankings;
+  if (rankings === undefined) {
+    rankings = [
+      body.gold_nomination_id,
+      body.silver_nomination_id,
+      body.bronze_nomination_id,
+    ].filter((id) => typeof id === "string" && id.length > 0);
   }
 
   if (!Array.isArray(rankings) || rankings.some((r) => typeof r !== "string")) {
