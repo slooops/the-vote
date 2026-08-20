@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, use } from "react";
-import { Film, BookOpen, RefreshCw } from "lucide-react";
+import { Film, BookOpen, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import WelcomeModal from "@/components/WelcomeModal";
 import SearchNominate from "@/components/SearchNominate";
@@ -36,6 +36,8 @@ export default function SessionPage({
   const [userName, setUserName] = useState<string>("");
   const [myNominationCount, setMyNominationCount] = useState(0);
   const [detailNomination, setDetailNomination] = useState<Nomination | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   const fetchSession = useCallback(async () => {
     const res = await fetch(`/api/sessions/${id}`);
@@ -117,6 +119,14 @@ export default function SessionPage({
     setUserToken(token);
     setUserName(nickname);
     setShowWelcome(false);
+  };
+
+  const handleSaveName = () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || !userToken) return;
+    setUser({ token: userToken, nickname: trimmed, hasSeenWelcome: true });
+    setUserName(trimmed);
+    setEditingName(false);
   };
 
   const handleNominationClick = (nom: Nomination) => {
@@ -209,9 +219,41 @@ export default function SessionPage({
         </div>
 
         {/* User info */}
-        {userName && (
-          <div className="text-zinc-500 text-sm">
+        {userName && !editingName && (
+          <div className="text-zinc-500 text-sm flex items-center gap-1.5">
             Voting as <span className="text-violet-400 font-medium">{userName}</span>
+            <button
+              onClick={() => {
+                setNameDraft(userName);
+                setEditingName(true);
+              }}
+              className="text-zinc-600 hover:text-violet-400 transition-colors"
+              title="Change name"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+        {editingName && (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveName();
+                if (e.key === "Escape") setEditingName(false);
+              }}
+              maxLength={20}
+              autoFocus
+              className="flex-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+            <button onClick={handleSaveName} className="p-1.5 text-green-400 hover:text-green-300">
+              <Check className="w-4 h-4" />
+            </button>
+            <button onClick={() => setEditingName(false)} className="p-1.5 text-zinc-500 hover:text-zinc-300">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 

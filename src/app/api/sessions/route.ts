@@ -32,9 +32,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ id, admin_token });
 }
 
-// GET /api/sessions - List all sessions (for admin dashboard)
+// GET /api/sessions - List all sessions, admin_token stripped (not used by
+// the current UI, which tracks each admin's own sessions in localStorage
+// instead - kept for compatibility, but must never leak admin tokens).
 export async function GET() {
   const sql = getDb();
   const sessions = await sql(`SELECT * FROM tv_sessions ORDER BY created_at DESC`);
-  return NextResponse.json(sessions);
+  const publicSessions = sessions.map(({ admin_token: _admin_token, ...rest }: Record<string, unknown>) => rest);
+  return NextResponse.json(publicSessions);
 }
