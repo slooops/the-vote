@@ -1,27 +1,43 @@
 # The Vote 🗳️
 
-Ranked choice voting for book clubs and movie nights. Share a link, nominate picks, vote Gold/Silver/Bronze, see live results.
+Ranked choice voting for book clubs and movie nights. Share a link, nominate picks, rank them, watch instant-runoff results come in live.
+
+## 🔗 Live URL — read this first
+
+**Production: https://the-vote-fox.vercel.app**
+
+That is the only URL the group actually uses. Other aliases exist on the same Vercel project and **should be treated as dead**:
+
+| URL | Status |
+|-----|--------|
+| `the-vote-fox.vercel.app` | ✅ **the real one** — share this, test against this |
+| `the-vote-phi.vercel.app` | ⛔️ deprecated, do not use or share |
+| `the-vote-slooops-projects.vercel.app` | ⛔️ deprecated |
+
+⚠️ **`vercel --prod` does not move the `fox` alias.** A plain production deploy updates a fresh deployment URL and the `phi` alias, leaving `fox` pointed at whatever it was pinned to before. This has caused a real outage: `fox` sat on a 36-day-old build while every deploy "succeeded" against `phi`, so voters got `500`s on every ballot while testing looked perfectly healthy. See [Deploy](#deploy).
 
 ## Stack
 
 - **Next.js 16** (App Router) + **Tailwind CSS** + **Framer Motion**
-- **Neon Postgres** for persistence
+- **Neon Postgres** for persistence (raw parameterized SQL via `@neondatabase/serverless`; `drizzle-orm` is installed but unused, and there are no migration files — schema changes are applied by hand)
 - **TMDB API** for movie posters, synopses, and streaming availability
 - **Open Library API** for book covers and author data
-- **Gemini 2.0 Flash** for AI-powered synopsis generation and corrections
+- **Gemini** for AI-assisted synopsis generation and refinement
 
 ## How It Works
 
-1. **Admin creates a session** — picks Movie Night or Book Club, gets an admin link + shareable voter link
-2. **Friends open the link** — set a nickname, browse existing nominations, search and nominate their pick
-3. **Admin closes nominations, opens voting** — everyone ranks their top picks (Gold = 3pts, Silver = 2pts, Bronze = 1pt)
-4. **Live results** update as votes come in. Admin closes voting to lock in the winner
+1. **Admin creates a session** — Movie Night or Book Club, gets an admin link plus a shareable voter link
+2. **Friends open the link** — set a nickname, browse nominations, search and nominate a pick, and tag it (1 mood + 1 type + 1–3 genres)
+3. **Admin closes nominations, opens voting** — each voter drags their picks into order. Top 3 get Gold/Silver/Bronze styling, the rest continue as a plain numbered list, and anything you don't care about stays in a "Not Ranking" tray
+4. **Results** run real **instant-runoff (IRV)**: each round the lowest-scoring nominee is eliminated and its ballots transfer to each voter's next surviving choice, until something holds a majority. Partial ballots are expected — a ballot with no remaining ranked choices is "exhausted" and stops counting toward the majority threshold. The results view shows the full round-by-round elimination
+
+Ranking is **not** a points system — there is no Gold=3/Silver=2/Bronze=1 scoring anymore, only the medal styling on the first three positions.
 
 ## Setup
 
 ```bash
 npm install
-cp .env.local.example .env.local  # fill in your keys
+cp .env.local.example .env.local  # then fill in real values
 npm run dev
 ```
 
@@ -30,10 +46,54 @@ npm run dev
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Neon Postgres connection string |
-| `TMDB_API_KEY` | TMDB API key (free at themoviedb.org) |
-| `TMDB_READ_ACCESS_TOKEN` | TMDB v4 read access token |
+| `TMDB_READ_ACCESS_TOKEN` | TMDB v4 "API Read Access Token" (the long JWT-looking one) |
 | `GEMINI_API_KEY` | Google Gemini API key |
+
+There is no `TMDB_API_KEY` requirement — the short v3 key is not referenced anywhere in the code, even though one is still stored in Vercel.
+
+### ⚠️ Recovering credentials from Vercel
+
+**You mostly can't.** All four Vercel env vars are stored as **Sensitive** (write-only). `vercel env pull` returns the literal string `"[SENSITIVE]"` in place of every real value, and `vercel env ls` only lists names. If `.env.local` is lost, regenerate from the source instead: Neon dashboard for `DATABASE_URL`, themoviedb.org for the TMDB token, aistudio.google.com for the Gemini key.
+
+```bash
+# List which vars exist (names only — values are never shown)
+vercel env ls --project the-vote
+```
+
+Two traps worth knowing:
+
+- **`vercel env pull` overwrites `.env.local` in place.** It will replace your real, working secrets with `[SENSITIVE]` placeholders. Back up first, or pull to a throwaway path: `vercel env pull /tmp/check.env --project the-vote`
+- **`vercel link` appends a `VERCEL_OIDC_TOKEN` line to `.env.local`** as a side effect.
+
+To set a secret without exposing it in shell history or `ps` output, pipe it via stdin rather than `--value`:
+
+```bash
+grep '^DATABASE_URL=' .env.local | cut -d= -f2- | vercel env add DATABASE_URL production --yes --project the-vote
+```
+
+### Database notes
+
+The Neon instance is **shared across several unrelated projects** and has a single unprotected `main` branch with ~24h history retention. Local dev points straight at it, so **`npm run dev` reads and writes live production data.** This project's tables are prefixed `tv_` (`tv_sessions`, `tv_nominations`, `tv_votes`, `tv_synopsis_cache`) — scope every migration and delete explicitly, and never run a bare `DROP`/`DELETE` without a `WHERE`.
+
+Because deployed clients keep running cached JS after a schema change, **make the API accept both old and new payload shapes and deploy that first, then drop columns.** Dropping `tv_votes.gold/silver/bronze_nomination_id` before doing so broke voting for everyone mid-meeting.
 
 ## Deploy
 
-Deploy to Vercel — set env vars in the dashboard or via `vercel env`.
+```bash
+vercel --prod --project the-vote
+```
+
+Then **always** repoint and verify the real alias — this step is not optional:
+
+```bash
+# Use the deployment URL printed by the deploy above
+vercel alias set <new-deployment-url> the-vote-fox.vercel.app
+
+# Confirm fox is serving the build you just shipped (check the `created` date)
+vercel inspect the-vote-fox.vercel.app
+
+# Smoke-test against fox, never phi
+curl -sS -o /dev/null -w "%{http_code}\n" https://the-vote-fox.vercel.app
+```
+
+If a bug reproduces for users but not for you, **check which deployment `fox` resolves to before debugging anything else.**
