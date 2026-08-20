@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Search, Loader2, Film, BookOpen, MessageCircle, Send, Check, Undo2, Edit3, Plus } from "lucide-react";
+import { Search, Loader2, Film, BookOpen, Sparkles, Send, Check, Undo2, Edit3, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { SearchResult, Session } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
-import { TAG_CATEGORIES, validateTags } from "@/lib/tags";
+import { TAG_CATEGORIES, TAG_TO_CATEGORY, validateTags, type TagCategory } from "@/lib/tags";
 
 interface SearchNominateProps {
   session: Session;
@@ -58,6 +58,23 @@ export default function SearchNominate({
 
   const selectedTags = [tagMood, tagType, ...tagGenres].filter(Boolean) as string[];
   const tagsValid = validateTags(selectedTags).valid;
+  const [tagsAutoFilled, setTagsAutoFilled] = useState(false);
+
+  // Prefill the picker from AI-suggested tags. Server-side coerceTags() has
+  // already dropped anything outside the taxonomy, so whatever arrives is safe
+  // to trust - and fully editable by the nominator afterwards.
+  const applySuggestedTags = (suggested: unknown) => {
+    if (!Array.isArray(suggested) || suggested.length === 0) return;
+    const byCat = (cat: TagCategory) =>
+      (suggested as string[]).filter((t) => TAG_TO_CATEGORY[t] === cat);
+    const [mood] = byCat("mood");
+    const [type] = byCat("type");
+    const genres = byCat("genre").slice(0, 3);
+    if (mood) setTagMood(mood);
+    if (type) setTagType(type);
+    if (genres.length) setTagGenres(genres);
+    if (mood || type || genres.length) setTagsAutoFilled(true);
+  };
 
   const search = useCallback(async () => {
     if (!query.trim()) return;
@@ -88,6 +105,7 @@ export default function SearchNominate({
     setTagMood(null);
     setTagType(null);
     setTagGenres([]);
+    setTagsAutoFilled(false);
 
     // Fetch synopsis from Gemini if not available
     if (!result.synopsis) {
@@ -107,6 +125,7 @@ export default function SearchNominate({
         const data = await res.json();
         setSynopsis(data.synopsis || "");
         if (data.author) setAuthor(data.author);
+        applySuggestedTags(data.tags);
       } catch {
         console.error("Synopsis fetch failed");
       } finally {
@@ -176,6 +195,7 @@ export default function SearchNominate({
     setTagMood(null);
     setTagType(null);
     setTagGenres([]);
+    setTagsAutoFilled(false);
   };
 
   const sendChatMessage = async () => {
@@ -514,6 +534,12 @@ export default function SearchNominate({
 
             {/* Tags */}
             <div className="px-5 pb-5 space-y-4 border-t border-zinc-700/50 pt-4">
+              {tagsAutoFilled && (
+                <p className="flex items-center gap-1.5 text-xs text-violet-400/80">
+                  <Sparkles className="w-3 h-3 flex-shrink-0" />
+                  AI-suggested — tap to change any of these
+                </p>
+              )}
               {(["mood", "type"] as const).map((cat) => (
                 <div key={cat}>
                   <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-2">
@@ -587,9 +613,9 @@ export default function SearchNominate({
                   <button
                     onClick={() => setShowChat(!showChat)}
                     className="text-zinc-500 hover:text-violet-400 transition-colors"
-                    title="Chat with AI about this"
+                    title="Fix this with AI"
                   >
-                    <MessageCircle className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4" />
                   </button>
                 </div>
               </div>

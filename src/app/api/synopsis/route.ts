@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getDb } from "@/lib/db";
 import { nanoid } from "nanoid";
+import { coerceTags, tagPromptInstruction } from "@/lib/tags";
 
 const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -89,6 +90,33 @@ async function fetchOpenLibraryDescription(openlibraryKey: string): Promise<stri
   }
 }
 
+// Classify an already-written synopsis. Used for the Open Library path, where
+// we have a description but never called Gemini - one small request, and only
+// for a title the user has actually selected. Failure is non-fatal: the user
+// just picks tags by hand.
+async function generateTagsOnly(
+  title: string,
+  type: string,
+  author: string | undefined,
+  synopsis: string
+): Promise<string[]> {
+  try {
+    const response = await generateSynopsis({
+      contents: `Here is a ${type} called "${title}"${author ? ` by ${author}` : ""}.
+
+Synopsis: ${synopsis}
+
+${tagPromptInstruction()}
+
+Respond in JSON format: { "tags": [...] }`,
+      config: { responseMimeType: "application/json" },
+    });
+    return coerceTags(JSON.parse(response.text || "{}").tags);
+  } catch {
+    return [];
+  }
+}
+
 // POST /api/synopsis - Get a synopsis (Open Library for books, else Gemini)
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -108,9 +136,31 @@ export async function POST(req: NextRequest) {
       [cacheKey]
     );
     if (cached.length > 0) {
+      const cachedTags = Array.isArray(cached[0].tags)
+        ? cached[0].tags
+        : JSON.parse(cached[0].tags || "[]");
+      let tags = coerceTags(cachedTags);
+
+      // Rows cached before tags existed have none. Classify once and backfill
+      // so the next nomination of this title is free again.
+      if (tags.length === 0 && cached[0].synopsis) {
+        tags = await generateTagsOnly(title, type, cached[0].author || author, cached[0].synopsis);
+        if (tags.length > 0) {
+          try {
+            await sql(`UPDATE tv_synopsis_cache SET tags = $1 WHERE lookup_key = $2`, [
+              JSON.stringify(tags),
+              cacheKey,
+            ]);
+          } catch {
+            // Backfill failure is non-critical - we still return the tags.
+          }
+        }
+      }
+
       return NextResponse.json({
         synopsis: cached[0].synopsis,
         author: cached[0].author,
+        tags,
         cached: true,
       });
     }
@@ -121,11 +171,13 @@ export async function POST(req: NextRequest) {
   if (!user_message && type === "book" && openlibrary_key) {
     const olDescription = await fetchOpenLibraryDescription(openlibrary_key);
     if (olDescription) {
+      // OL gave us prose but no tags, so spend one Gemini call to classify it.
+      const tags = await generateTagsOnly(title, type, author, olDescription);
       const cacheKey = `${type}:${title}:${author || ""}`.toLowerCase();
       try {
         await sql(
-          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author) VALUES ($1, $2, $3, $4) ON CONFLICT (lookup_key) DO NOTHING`,
-          [nanoid(10), cacheKey, olDescription, author || null]
+          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (lookup_key) DO NOTHING`,
+          [nanoid(10), cacheKey, olDescription, author || null, JSON.stringify(tags)]
         );
       } catch {
         // Cache write failure is non-critical
@@ -133,6 +185,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         synopsis: olDescription,
         author: author || undefined,
+        tags,
         source: "openlibrary",
       });
     }
@@ -158,9 +211,17 @@ Respond with a corrected or updated synopsis. Keep it to 2-3 sentences max. If t
 
 Respond in JSON format: { "synopsis": "...", "author": "..." }`;
   } else {
-    prompt = type === "movie"
-      ? `Write a 2-3 sentence synopsis for the movie "${title}"${year ? ` (${year})` : ""}. Include the director's name. Respond in JSON format: { "synopsis": "...", "author": "director name" }`
-      : `Write a 2-3 sentence synopsis for the book "${title}"${author ? ` by ${author}` : ""}${year ? ` (${year})` : ""}. Include the author's name. Respond in JSON format: { "synopsis": "...", "author": "author name" }`;
+    const subject = type === "movie"
+      ? `the movie "${title}"${year ? ` (${year})` : ""}`
+      : `the book "${title}"${author ? ` by ${author}` : ""}${year ? ` (${year})` : ""}`;
+    const credit = type === "movie" ? "director name" : "author name";
+
+    // Tags ride along in the same request as the synopsis - no extra quota.
+    prompt = `Write a 2-3 sentence synopsis for ${subject}. Include the ${type === "movie" ? "director's" : "author's"} name.
+
+${tagPromptInstruction()}
+
+Respond in JSON format: { "synopsis": "...", "author": "${credit}", "tags": [...] }`;
   }
 
   try {
@@ -172,7 +233,7 @@ Respond in JSON format: { "synopsis": "...", "author": "..." }`;
     });
 
     const text = response.text || "";
-    let parsed: { synopsis: string; author?: string };
+    let parsed: { synopsis: string; author?: string; tags?: unknown };
 
     try {
       parsed = JSON.parse(text);
@@ -181,20 +242,23 @@ Respond in JSON format: { "synopsis": "...", "author": "..." }`;
       parsed = { synopsis: text, author: author || undefined };
     }
 
+    // Drop anything the model invented outside the taxonomy.
+    const tags = coerceTags(parsed.tags);
+
     // Cache the result (only for initial generations)
     if (!user_message && parsed.synopsis) {
       const cacheKey = `${type}:${title}:${author || ""}`.toLowerCase();
       try {
         await sql(
-          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author) VALUES ($1, $2, $3, $4) ON CONFLICT (lookup_key) DO NOTHING`,
-          [nanoid(10), cacheKey, parsed.synopsis, parsed.author || null]
+          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (lookup_key) DO NOTHING`,
+          [nanoid(10), cacheKey, parsed.synopsis, parsed.author || null, JSON.stringify(tags)]
         );
       } catch {
         // Cache write failure is non-critical
       }
     }
 
-    return NextResponse.json(parsed);
+    return NextResponse.json({ ...parsed, tags });
   } catch (error) {
     console.error("Gemini error:", error);
     return NextResponse.json(
