@@ -1,0 +1,56 @@
+src/app/api/votes/route.ts
+  s_486dc89eb960c8::t_3eadb8655bec80 59-68,71-73,78-80,84
+src/app/session/[id]/page.tsx
+  s_486dc89eb960c8::t_fa8dcd724f28c2 352,359-361,363-371,373-384
+  s_486dc89eb960c8::t_36041941e5702e 33
+  s_486dc89eb960c8::t_d1e532250337bc 83
+  s_486dc89eb960c8::t_c14b8e35010ade 4
+src/components/VotingBooth.tsx
+  s_486dc89eb960c8::t_5cc52b892ca6a9 4
+  s_486dc89eb960c8::t_d44f71b432ca38 17
+  s_486dc89eb960c8::t_72fc1d6bef76d0 87,92-94
+  s_486dc89eb960c8::t_866653caeda12a 35,43-46
+  s_486dc89eb960c8::t_c72c9f0c40e548 103-187
+  s_486dc89eb960c8::t_83e6c6e9d1a2a6 349-403
+src/app/api/sessions/[id]/route.ts
+  s_486dc89eb960c8::t_2732d934f4a324 31-40
+  s_486dc89eb960c8::t_5bcdf9ef387496 71-88
+src/lib/types.ts
+  s_486dc89eb960c8::t_de04448479eb91 49-50
+  s_486dc89eb960c8::t_5f97aa7d739053 13-18
+  s_486dc89eb960c8::t_5253dde9f62100 65-76
+src/app/session/[id]/admin/[token]/page.tsx
+  s_486dc89eb960c8::t_e09cd54e67659e 49-52
+  s_486dc89eb960c8::t_c946f45460d0ff 78-79,88
+  s_486dc89eb960c8::t_6ed8e6e6493071 20-22
+  s_486dc89eb960c8::t_f06c56107a00f1 27
+  s_486dc89eb960c8::t_370726fc55e8e2 154-155,165-180
+  s_486dc89eb960c8::t_c024a9d7f6fcc1 435-498
+  s_486dc89eb960c8::t_aa4b38dc5c61ac 596-640
+  s_486dc89eb960c8::t_7de2f9cff69ed1 181-183
+src/app/api/results/[id]/route.ts
+  s_486dc89eb960c8::t_ed40be6cdc390d 3
+  s_486dc89eb960c8::t_babc945988a262 9
+  s_486dc89eb960c8::t_2a0686e260bea2 170,177
+  s_486dc89eb960c8::t_acb97b996a83d9 18
+  s_486dc89eb960c8::t_1561d43ae6e38d 134-154
+  s_486dc89eb960c8::t_d58ae2ee95a209 28-29
+  s_486dc89eb960c8::t_47c0d6ad00acaf 61-67,73-74,84-98,103-111
+  s_486dc89eb960c8::t_b7d694f325fff0 226-227
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c9896c02a51af57ed588086788a6f9030a40e259",
+  "prompts": {},
+  "sessions": {
+    "s_486dc89eb960c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b47ecad5-9018-47b5-b49a-2a0d0f19667e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "jack <82819874+slooops@users.noreply.github.com>"
+    }
+  }
+}
