@@ -10,6 +10,12 @@ export interface Session {
   admin_token: string;
   streaming_services: string[];
   max_nominations: number;
+  // Single-vote mode: a ballot locks on submit and only the admin can reopen
+  // voting. Turn off for the old behavior where voters re-rank freely.
+  lock_ballots: boolean;
+  // Show the running tally while voting is open. Off by default so an early
+  // voter can't watch the standings and lobby whoever hasn't voted yet.
+  live_results: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +46,8 @@ export interface Vote {
   voter_token: string;
   voter_name: string;
   rankings: string[];
+  // True once submitted in single-vote mode; cleared when an admin reopens.
+  locked: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +62,18 @@ export interface IRVRound {
   tallies: IRVRoundTally[];
   eliminated: string | null;
   exhausted_count: number;
+  // True when several candidates were tied for last and the tiebreak rule,
+  // not the voters, decided who went out.
+  tiebreak: boolean;
+}
+
+// Set when the FINAL elimination was settled by the tiebreak rule, meaning the
+// winner didn't actually out-poll the runner-up. Surfaced to the admin as a
+// prompt to reopen voting.
+export interface FinalTie {
+  round: number;
+  candidates: string[];
+  votes: number;
 }
 
 export interface RankedResult extends Nomination {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, use } from "react";
-import { Film, BookOpen, RefreshCw, Pencil, Check, X } from "lucide-react";
+import { Film, BookOpen, RefreshCw, Pencil, Check, X, EyeOff } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import WelcomeModal from "@/components/WelcomeModal";
 import SearchNominate from "@/components/SearchNominate";
@@ -30,6 +30,7 @@ export default function SessionPage({
   const [rounds, setRounds] = useState<IRVRound[]>([]);
   const [totalVotes, setTotalVotes] = useState(0);
   const [exhaustedFinal, setExhaustedFinal] = useState(0);
+  const [resultsHidden, setResultsHidden] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export default function SessionPage({
       setRounds(data.rounds);
       setTotalVotes(data.total_votes);
       setExhaustedFinal(data.exhausted_final);
+      setResultsHidden(!!data.hidden);
     }
   }, [id]);
 
@@ -347,23 +349,39 @@ export default function SessionPage({
               voterToken={userToken}
               voterName={userName}
               existingVote={myVote}
+              lockBallots={session.lock_ballots !== false}
               onVoted={() => {
                 fetchResults();
                 fetchMyVote();
               }}
               onNominationClick={handleNominationClick}
             />
-            {/* Live results */}
-            {results.length > 0 && (
+            {/* Results are sealed until voting closes unless the organizer
+                turned on live results. */}
+            {resultsHidden ? (
               <div className="border-t border-zinc-800 pt-6">
-                <ResultsChart
-                  results={results}
-                  rounds={rounds}
-                  totalVotes={totalVotes}
-                  exhaustedFinal={exhaustedFinal}
-                  onNominationClick={handleNominationClick}
-                />
+                <div className="text-center py-6 px-4 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                  <EyeOff className="w-5 h-5 text-zinc-600 mx-auto mb-2" />
+                  <p className="text-zinc-400 text-sm font-medium">
+                    Results are hidden until voting closes
+                  </p>
+                  <p className="text-zinc-600 text-xs mt-1">
+                    {totalVotes} {totalVotes === 1 ? "person has" : "people have"} voted so far
+                  </p>
+                </div>
               </div>
+            ) : (
+              results.length > 0 && (
+                <div className="border-t border-zinc-800 pt-6">
+                  <ResultsChart
+                    results={results}
+                    rounds={rounds}
+                    totalVotes={totalVotes}
+                    exhaustedFinal={exhaustedFinal}
+                    onNominationClick={handleNominationClick}
+                  />
+                </div>
+              )
             )}
           </>
         )}

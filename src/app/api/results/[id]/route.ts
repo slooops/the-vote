@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import type { IRVRound, IRVRoundTally } from "@/lib/types";
+import type { IRVRound, IRVRoundTally, FinalTie } from "@/lib/types";
 
 interface IRVOutcome {
   rounds: IRVRound[];
   winner: string | null;
   eliminationOrder: string[];
+  finalTie: FinalTie | null;
 }
 
 // Runs standard instant-runoff on a set of candidate ids and ranked (possibly
@@ -14,7 +15,7 @@ interface IRVOutcome {
 // round's majority threshold, exactly like a real-world partial IRV ballot.
 function runIRV(candidateIds: string[], ballots: string[][]): IRVOutcome {
   if (candidateIds.length === 0) {
-    return { rounds: [], winner: null, eliminationOrder: [] };
+    return { rounds: [], winner: null, eliminationOrder: [], finalTie: null };
   }
 
   const active = new Set(candidateIds);
@@ -24,6 +25,8 @@ function runIRV(candidateIds: string[], ballots: string[][]): IRVOutcome {
   const rounds: IRVRound[] = [];
   const eliminationOrder: string[] = [];
   let winner: string | null = null;
+  let lastTiebreak: FinalTie | null = null;
+  let lastTiebreakRound = -1;
 
   while (true) {
     const tallies: Record<string, number> = {};
@@ -55,13 +58,20 @@ function runIRV(candidateIds: string[], ballots: string[][]): IRVOutcome {
     }
 
     if (roundWinner) {
-      rounds.push({ round: rounds.length + 1, tallies: tallyList, eliminated: null, exhausted_count });
+      rounds.push({
+        round: rounds.length + 1,
+        tallies: tallyList,
+        eliminated: null,
+        exhausted_count,
+        tiebreak: false,
+      });
       winner = roundWinner;
       break;
     }
 
     const minVotes = Math.min(...Array.from(active).map((id) => tallies[id]));
-    let candidates = Array.from(active).filter((id) => tallies[id] === minVotes);
+    const tiedAtMinimum = Array.from(active).filter((id) => tallies[id] === minVotes);
+    let candidates = tiedAtMinimum;
     if (candidates.length > 1) {
       // Deterministic tiebreak: fewest cumulative votes across all rounds so
       // far, then lowest id alphabetically - reproducible, no randomness.
@@ -71,13 +81,34 @@ function runIRV(candidateIds: string[], ballots: string[][]): IRVOutcome {
       });
     }
     const eliminated = candidates[0];
+    const wasTiebreak = tiedAtMinimum.length > 1;
 
-    rounds.push({ round: rounds.length + 1, tallies: tallyList, eliminated, exhausted_count });
+    rounds.push({
+      round: rounds.length + 1,
+      tallies: tallyList,
+      eliminated,
+      exhausted_count,
+      tiebreak: wasTiebreak,
+    });
+    if (wasTiebreak) {
+      // Overwritten each time, so this ends up describing the LAST tiebreak -
+      // the one that actually decided who survived to win.
+      lastTiebreak = { round: rounds.length, candidates: tiedAtMinimum, votes: minVotes };
+      lastTiebreakRound = rounds.length;
+    }
     eliminationOrder.push(eliminated);
     active.delete(eliminated);
   }
 
-  return { rounds, winner, eliminationOrder };
+  // Only call it a tie if the tiebreak happened in the final elimination - at
+  // that point the "winner" never actually out-polled the runner-up, the
+  // tiebreak rule picked for them. An early-round tiebreak among also-rans
+  // doesn't make the result ambiguous.
+  const lastEliminationRound = rounds.filter((r) => r.eliminated).length;
+  const finalTie =
+    lastTiebreak && lastTiebreakRound === lastEliminationRound ? lastTiebreak : null;
+
+  return { rounds, winner, eliminationOrder, finalTie };
 }
 
 // GET /api/results/[id] - Get IRV-tallied results for a session
@@ -100,6 +131,27 @@ export async function GET(
 
   const votes = await sql(`SELECT * FROM tv_votes WHERE session_id = $1`, [id]);
 
+  // Strip admin_token before anything can return the session.
+  const { admin_token: _, ...publicSession } = session[0];
+
+  // Results stay sealed while voting is open unless the admin enabled live
+  // results. Without this, an early voter can watch the standings and lobby
+  // whoever hasn't voted yet - which is the campaigning problem, not just
+  // re-ranking. Only the participation count leaks.
+  const resultsHidden =
+    session[0].status === "voting_open" && session[0].live_results !== true;
+  if (resultsHidden) {
+    return NextResponse.json({
+      session: publicSession,
+      results: [],
+      rounds: [],
+      total_votes: votes.length,
+      exhausted_final: 0,
+      final_tie: null,
+      hidden: true,
+    });
+  }
+
   const nominationIds: string[] = nominations.map((n: Record<string, unknown>) => n.id as string);
   const validIds = new Set(nominationIds);
 
@@ -115,12 +167,14 @@ export async function GET(
   let rounds: IRVRound[] = [];
   let winner: string | null = null;
   let eliminationOrder: string[] = [];
+  let finalTie: FinalTie | null = null;
 
   if (votes.length > 0) {
     const outcome = runIRV(nominationIds, ballots);
     rounds = outcome.rounds;
     winner = outcome.winner;
     eliminationOrder = outcome.eliminationOrder;
+    finalTie = outcome.finalTie;
   }
 
   const eliminatedRoundByNomId: Record<string, number> = {};
@@ -163,14 +217,13 @@ export async function GET(
     }))
     .sort((a: { rank: number }, b: { rank: number }) => a.rank - b.rank);
 
-  // Strip admin_token from session
-  const { admin_token: _, ...publicSession } = session[0];
-
   return NextResponse.json({
     session: publicSession,
     results,
     rounds,
     total_votes: votes.length,
     exhausted_final: rounds.length > 0 ? rounds[rounds.length - 1].exhausted_count : 0,
+    final_tie: finalTie,
+    hidden: false,
   });
 }

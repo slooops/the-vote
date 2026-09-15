@@ -56,22 +56,32 @@ export async function POST(req: NextRequest) {
     [session_id, voter_token]
   );
 
+  // Single-vote mode: a submitted ballot is final. Enforced here, not just in
+  // the UI, so a stale tab or a hand-rolled request can't re-rank either.
+  const lockBallots = session[0].lock_ballots !== false;
+  if (existing.length > 0 && existing[0].locked) {
+    return NextResponse.json(
+      { error: "Your ranking is locked. Only the organizer can reopen voting." },
+      { status: 409 }
+    );
+  }
+
   if (existing.length > 0) {
     await sql(
-      `UPDATE tv_votes SET rankings = $1, voter_name = $2, updated_at = NOW()
-       WHERE session_id = $3 AND voter_token = $4`,
-      [JSON.stringify(rankings), voter_name, session_id, voter_token]
+      `UPDATE tv_votes SET rankings = $1, voter_name = $2, locked = $3, updated_at = NOW()
+       WHERE session_id = $4 AND voter_token = $5`,
+      [JSON.stringify(rankings), voter_name, lockBallots, session_id, voter_token]
     );
   } else {
     const id = nanoid(10);
     await sql(
-      `INSERT INTO tv_votes (id, session_id, voter_token, voter_name, rankings)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, session_id, voter_token, voter_name, JSON.stringify(rankings)]
+      `INSERT INTO tv_votes (id, session_id, voter_token, voter_name, rankings, locked)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, session_id, voter_token, voter_name, JSON.stringify(rankings), lockBallots]
     );
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, locked: lockBallots });
 }
 
 // GET /api/votes?session_id=xxx&voter_token=yyy - Get user's vote

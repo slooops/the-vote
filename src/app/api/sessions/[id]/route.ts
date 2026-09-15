@@ -28,7 +28,16 @@ export async function PATCH(
   const { id } = await params;
   const sql = getDb();
   const body = await req.json();
-  const { admin_token, status, streaming_services, name, max_nominations } = body;
+  const {
+    admin_token,
+    status,
+    streaming_services,
+    name,
+    max_nominations,
+    lock_ballots,
+    live_results,
+    reopen_voting,
+  } = body;
 
   // Verify admin
   const rows = await sql(`SELECT * FROM tv_sessions WHERE id = $1`, [id]);
@@ -58,6 +67,24 @@ export async function PATCH(
   if (max_nominations !== undefined) {
     updates.push(`max_nominations = $${paramIndex++}`);
     values.push(max_nominations);
+  }
+  if (lock_ballots !== undefined) {
+    updates.push(`lock_ballots = $${paramIndex++}`);
+    values.push(!!lock_ballots);
+  }
+  if (live_results !== undefined) {
+    updates.push(`live_results = $${paramIndex++}`);
+    values.push(!!live_results);
+  }
+
+  // Admin-only reopen: unlock every ballot so voters can adjust the ranking
+  // they already submitted, and put the session back into voting.
+  if (reopen_voting) {
+    await sql(`UPDATE tv_votes SET locked = false WHERE session_id = $1`, [id]);
+    if (!status) {
+      updates.push(`status = $${paramIndex++}`);
+      values.push("voting_open");
+    }
   }
 
   updates.push(`updated_at = NOW()`);

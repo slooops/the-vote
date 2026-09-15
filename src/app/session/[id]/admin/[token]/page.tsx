@@ -17,11 +17,14 @@ import {
   X,
   RefreshCw,
   Trash2,
+  AlertTriangle,
+  RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import NominationList from "@/components/NominationList";
 import ResultsChart from "@/components/ResultsChart";
-import type { Session, Nomination, RankedResult, IRVRound } from "@/lib/types";
+import type { Session, Nomination, RankedResult, IRVRound, FinalTie } from "@/lib/types";
 import { saveAdminSession, getAdminSessions, type AdminSession } from "@/lib/admin-sessions";
 
 export default function AdminPage({
@@ -43,6 +46,10 @@ export default function AdminPage({
   const [editServices, setEditServices] = useState<string[]>([]);
   const [newService, setNewService] = useState("");
   const [editMaxNoms, setEditMaxNoms] = useState(1);
+  const [editLockBallots, setEditLockBallots] = useState(true);
+  const [editLiveResults, setEditLiveResults] = useState(false);
+  const [finalTie, setFinalTie] = useState<FinalTie | null>(null);
+  const [reopening, setReopening] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [showSessionSwitcher, setShowSessionSwitcher] = useState(false);
   const [otherSessions, setOtherSessions] = useState<AdminSession[]>([]);
@@ -68,6 +75,8 @@ export default function AdminPage({
         : JSON.parse(s.streaming_services);
       setEditServices(services);
       setEditMaxNoms(s.max_nominations ?? 1);
+      setEditLockBallots(s.lock_ballots !== false);
+      setEditLiveResults(s.live_results === true);
     }
     if (nomsRes.ok) setNominations(await nomsRes.json());
     if (resultsRes.ok) {
@@ -76,6 +85,7 @@ export default function AdminPage({
       setRounds(r.rounds);
       setTotalVotes(r.total_votes);
       setExhaustedFinal(r.exhausted_final);
+      setFinalTie(r.final_tie ?? null);
     }
   }, [id]);
 
@@ -141,12 +151,33 @@ export default function AdminPage({
           admin_token: token,
           streaming_services: editServices,
           max_nominations: editMaxNoms,
+          lock_ballots: editLockBallots,
+          live_results: editLiveResults,
         }),
       });
       await fetchAll();
       setShowSettings(false);
     } catch {
       alert("Failed to save settings");
+    }
+  };
+
+  // Unlocks every ballot and puts the election back into voting. Voters keep
+  // the ranking they already submitted and can adjust it.
+  const reopenVoting = async () => {
+    setReopening(true);
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admin_token: token, reopen_voting: true }),
+      });
+      if (!res.ok) throw new Error();
+      await fetchAll();
+    } catch {
+      alert("Failed to reopen voting");
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -401,6 +432,70 @@ export default function AdminPage({
                 </p>
               </div>
 
+              {/* Voting rules */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                  Voting Rules
+                </h3>
+
+                <button
+                  onClick={() => setEditLockBallots(!editLockBallots)}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-left transition-colors"
+                >
+                  <div
+                    className={`mt-0.5 w-9 h-5 rounded-full flex-shrink-0 transition-colors relative ${
+                      editLockBallots ? "bg-violet-600" : "bg-zinc-700"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${
+                        editLockBallots ? "left-[1.125rem]" : "left-0.5"
+                      }`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium">One vote each</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">
+                      {editLockBallots
+                        ? "Ballots lock when submitted. Nobody can re-rank after seeing how it's going."
+                        : "Voters can change their ranking any time while voting is open."}
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setEditLiveResults(!editLiveResults)}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 text-left transition-colors"
+                >
+                  <div
+                    className={`mt-0.5 w-9 h-5 rounded-full flex-shrink-0 transition-colors relative ${
+                      editLiveResults ? "bg-violet-600" : "bg-zinc-700"
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${
+                        editLiveResults ? "left-[1.125rem]" : "left-0.5"
+                      }`}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-white text-sm font-medium">Live results</p>
+                    <p className="text-zinc-500 text-xs mt-0.5">
+                      {editLiveResults
+                        ? "Everyone sees the running tally while voting is open."
+                        : "Results stay hidden until you close voting — only the vote count shows."}
+                    </p>
+                  </div>
+                </button>
+
+                {!editLockBallots && editLiveResults && (
+                  <p className="text-amber-400/80 text-xs px-1">
+                    Heads up: with both on, someone can watch the standings and re-rank to
+                    counter whoever&apos;s winning.
+                  </p>
+                )}
+              </div>
+
               {/* Streaming services (movies only) */}
               {session.type === "movie" && (
                 <div className="space-y-2">
@@ -497,6 +592,51 @@ export default function AdminPage({
             ))
           )}
         </div>
+
+        {/* Tie prompt — the winner was decided by the tiebreak rule rather
+            than by out-polling anyone, so offer a revote. */}
+        {finalTie && session.status === "voting_closed" && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-300 font-semibold text-sm">
+                  This ended in a tie
+                </p>
+                <p className="text-zinc-300 text-xs mt-1">
+                  {finalTie.candidates.length} options were tied on {finalTie.votes}{" "}
+                  {finalTie.votes === 1 ? "vote" : "votes"} in round {finalTie.round}, so the
+                  tiebreak rule picked the winner rather than the voters. You can reopen voting
+                  to settle it.
+                </p>
+                <p className="text-zinc-500 text-xs mt-1.5">
+                  Tied:{" "}
+                  {finalTie.candidates
+                    .map((cid) => results.find((r) => r.id === cid)?.title || "Unknown")
+                    .join(" · ")}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={reopenVoting}
+              disabled={reopening}
+              className="w-full py-3 rounded-xl font-semibold bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 text-white flex items-center justify-center gap-2"
+            >
+              {reopening ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <RotateCcw className="w-4 h-4" />
+                  Reopen Voting
+                </>
+              )}
+            </button>
+            <p className="text-zinc-500 text-xs text-center">
+              Everyone&apos;s ballot unlocks with their current ranking kept, so they can adjust
+              rather than start over.
+            </p>
+          </div>
+        )}
 
         {/* Results */}
         {results.length > 0 && (
