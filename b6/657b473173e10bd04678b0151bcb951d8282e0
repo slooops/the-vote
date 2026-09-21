@@ -1,0 +1,21 @@
+src/app/session/[id]/admin/[token]/page.tsx
+  s_486dc89eb960c8::t_19f48f43bf1793 313
+  s_486dc89eb960c8::t_a6faba5a93a99f 73-76
+  s_486dc89eb960c8::t_ac3179bb5dd458 126-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b6657b473173e10bd04678b0151bcb951d8282e0",
+  "prompts": {},
+  "sessions": {
+    "s_486dc89eb960c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b47ecad5-9018-47b5-b49a-2a0d0f19667e",
+        "model": "claude-opus-5"
+      },
+      "human_author": "jack <82819874+slooops@users.noreply.github.com>"
+    }
+  }
+}
