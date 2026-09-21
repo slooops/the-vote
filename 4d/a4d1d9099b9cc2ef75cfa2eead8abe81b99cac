@@ -1,0 +1,20 @@
+src/components/SearchNominate.tsx
+  s_486dc89eb960c8::t_3fbb3eb35ca540 263-293
+  s_486dc89eb960c8::t_37312e057d9c43 326
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4da4d1d9099b9cc2ef75cfa2eead8abe81b99cac",
+  "prompts": {},
+  "sessions": {
+    "s_486dc89eb960c8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b47ecad5-9018-47b5-b49a-2a0d0f19667e",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "jack <82819874+slooops@users.noreply.github.com>"
+    }
+  }
+}
