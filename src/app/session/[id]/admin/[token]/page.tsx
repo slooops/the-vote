@@ -70,13 +70,10 @@ export default function AdminPage({
     if (sessionRes.ok) {
       const s = await sessionRes.json();
       setSession(s);
-      const services = Array.isArray(s.streaming_services)
-        ? s.streaming_services
-        : JSON.parse(s.streaming_services);
-      setEditServices(services);
-      setEditMaxNoms(s.max_nominations ?? 1);
-      setEditLockBallots(s.lock_ballots !== false);
-      setEditLiveResults(s.live_results === true);
+      // Deliberately NOT syncing the settings form here. This runs on a 10s
+      // poll, and overwriting the form would wipe any selection the admin
+      // hasn't saved yet (picking "3" nominations then watching it snap back
+      // to 1). The form is hydrated from `session` when the panel is opened.
     }
     if (nomsRes.ok) setNominations(await nomsRes.json());
     if (resultsRes.ok) {
@@ -125,6 +122,22 @@ export default function AdminPage({
     const interval = setInterval(fetchAll, 10000);
     return () => clearInterval(interval);
   }, [authorized, fetchAll]);
+
+  // Hydrate the settings form from the latest session data at the moment the
+  // panel opens. While it's open the admin owns the form state, so the 10s
+  // poll must not touch it.
+  const openSettings = () => {
+    if (session) {
+      const services = Array.isArray(session.streaming_services)
+        ? session.streaming_services
+        : JSON.parse(session.streaming_services as unknown as string);
+      setEditServices(services);
+      setEditMaxNoms(session.max_nominations ?? 1);
+      setEditLockBallots(session.lock_ballots !== false);
+      setEditLiveResults(session.live_results === true);
+    }
+    setShowSettings(true);
+  };
 
   const updateStatus = async (newStatus: string) => {
     setUpdating(true);
@@ -297,7 +310,7 @@ export default function AdminPage({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowSettings(!showSettings)}
+              onClick={() => (showSettings ? setShowSettings(false) : openSettings())}
               className="p-2 text-zinc-500 hover:text-violet-400"
             >
               <Settings className="w-5 h-5" />
