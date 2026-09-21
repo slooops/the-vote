@@ -35,6 +35,11 @@ export interface Nomination {
   streaming_rent: string[];
   availability: "free" | "rent" | "unavailable";
   tags: string[];
+  // Community rating normalized to 0-5 (TMDB for movies, Open Library for
+  // books). Null when the source has none or too few to be meaningful.
+  rating: number | null;
+  rating_count: number | null;
+  rating_source: string | null;
   nominated_by_token: string;
   nominated_by_name: string;
   created_at: string;
@@ -108,4 +113,7 @@ export interface SearchResult {
   tmdb_id?: number;
   openlibrary_key?: string;
   pages?: number;
+  rating?: number | null;
+  rating_count?: number | null;
+  rating_source?: string | null;
 }

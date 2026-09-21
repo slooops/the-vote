@@ -108,7 +108,10 @@ function runIRV(candidateIds: string[], ballots: string[][]): IRVOutcome {
   const finalTie =
     lastTiebreak && lastTiebreakRound === lastEliminationRound ? lastTiebreak : null;
 
-  return { rounds, winner, eliminationOrder, finalTie };
+  // When the final elimination was a tie, the tiebreak rule picked who
+  // survived to "win" - the voters didn't. Report NO winner rather than
+  // crowning whoever happened to sort first, and let the organizer decide.
+  return { rounds, winner: finalTie ? null : winner, eliminationOrder, finalTie };
 }
 
 // GET /api/results/[id] - Get IRV-tallied results for a session
@@ -191,22 +194,35 @@ export async function GET(
   // never lost a runoff, they just didn't need to since a majority emerged),
   // then formally-eliminated candidates in reverse elimination order (most
   // recently eliminated ranks higher - standard IRV convention).
-  const rankOrder = winner
-    ? [
-        winner,
-        ...rounds[rounds.length - 1].tallies
-          .filter((t) => t.nomination_id !== winner)
-          .map((t) => t.nomination_id),
-        ...[...eliminationOrder].reverse(),
-      ]
-    : votes.length > 0
-    ? [...eliminationOrder].reverse()
-    : nominationIds;
-
   const rankById: Record<string, number> = {};
-  rankOrder.forEach((nomId, i) => {
-    rankById[nomId] = i + 1;
-  });
+  if (finalTie) {
+    // Unresolved tie: every tied candidate genuinely shares first place. Rank
+    // them all 1, then everyone else follows from 2 in reverse elimination
+    // order (the tied ones appear in eliminationOrder too - skip those).
+    const tied = new Set(finalTie.candidates);
+    for (const id of finalTie.candidates) rankById[id] = 1;
+    [...eliminationOrder]
+      .reverse()
+      .filter((id) => !tied.has(id))
+      .forEach((id, i) => {
+        rankById[id] = 2 + i;
+      });
+  } else {
+    const rankOrder = winner
+      ? [
+          winner,
+          ...rounds[rounds.length - 1].tallies
+            .filter((t) => t.nomination_id !== winner)
+            .map((t) => t.nomination_id),
+          ...[...eliminationOrder].reverse(),
+        ]
+      : votes.length > 0
+      ? [...eliminationOrder].reverse()
+      : nominationIds;
+    rankOrder.forEach((nomId, i) => {
+      rankById[nomId] = i + 1;
+    });
+  }
 
   const results = nominations
     .map((nom: Record<string, unknown>) => ({

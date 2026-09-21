@@ -7,6 +7,8 @@ import type { SearchResult, Session } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
 import { TAG_CATEGORIES, TAG_TO_CATEGORY, validateTags, type TagCategory } from "@/lib/tags";
+import TagChip from "./TagChip";
+import StarRating from "./StarRating";
 
 interface SearchNominateProps {
   session: Session;
@@ -59,6 +61,10 @@ export default function SearchNominate({
   const selectedTags = [tagMood, tagType, ...tagGenres].filter(Boolean) as string[];
   const tagsValid = validateTags(selectedTags).valid;
   const [tagsAutoFilled, setTagsAutoFilled] = useState(false);
+  const [editingTags, setEditingTags] = useState(false);
+  const [rating, setRating] = useState<number | null>(null);
+  const [ratingCount, setRatingCount] = useState<number | null>(null);
+  const [ratingSource, setRatingSource] = useState<string | null>(null);
 
   // Prefill the picker from AI-suggested tags. Server-side coerceTags() has
   // already dropped anything outside the taxonomy, so whatever arrives is safe
@@ -106,6 +112,10 @@ export default function SearchNominate({
     setTagType(null);
     setTagGenres([]);
     setTagsAutoFilled(false);
+    setEditingTags(false);
+    setRating(result.rating ?? null);
+    setRatingCount(result.rating_count ?? null);
+    setRatingSource(result.rating_source ?? null);
 
     // Fetch synopsis from Gemini if not available
     if (!result.synopsis) {
@@ -126,6 +136,11 @@ export default function SearchNominate({
         setSynopsis(data.synopsis || "");
         if (data.author) setAuthor(data.author);
         applySuggestedTags(data.tags);
+        if (typeof data.rating === "number") {
+          setRating(data.rating);
+          setRatingCount(data.rating_count ?? null);
+          setRatingSource("openlibrary");
+        }
       } catch {
         console.error("Synopsis fetch failed");
       } finally {
@@ -196,6 +211,10 @@ export default function SearchNominate({
     setTagType(null);
     setTagGenres([]);
     setTagsAutoFilled(false);
+    setEditingTags(false);
+    setRating(null);
+    setRatingCount(null);
+    setRatingSource(null);
   };
 
   const sendChatMessage = async () => {
@@ -263,6 +282,9 @@ export default function SearchNominate({
           streaming_rent: rentOn,
           availability,
           tags: selectedTags,
+          rating,
+          rating_count: ratingCount,
+          rating_source: ratingSource,
           voter_token: voterToken,
           voter_name: voterName,
           replace_id: replaceId,
@@ -366,10 +388,13 @@ export default function SearchNominate({
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-white font-medium truncate">{result.title}</p>
-                  <p className="text-zinc-400 text-sm">
-                    {result.year}
-                    {result.author ? ` · ${result.author}` : ""}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-zinc-400 text-sm">
+                      {result.year}
+                      {result.author ? ` · ${result.author}` : ""}
+                    </p>
+                    <StarRating rating={result.rating} ratingCount={result.rating_count} />
+                  </div>
                 </div>
               </motion.button>
             ))}
@@ -488,6 +513,11 @@ export default function SearchNominate({
                   {author ? ` · ${author}` : ""}
                   {selected.pages ? ` · ${selected.pages} pages` : ""}
                 </p>
+                {rating !== null && (
+                  <div className="mt-1.5">
+                    <StarRating rating={rating} ratingCount={ratingCount} size="md" showCount />
+                  </div>
+                )}
 
                 {/* Availability badge */}
                 {session.type === "movie" && (
@@ -532,14 +562,33 @@ export default function SearchNominate({
               </div>
             </div>
 
-            {/* Tags */}
+            {/* Tags. When the AI has already picked them, show the result as
+                read-only chips behind an explicit "Edit" - the full picker
+                looked like an empty form demanding input, so people filled it
+                in and overwrote the suggestions. */}
+            {tagsAutoFilled && tagsValid && !editingTags ? (
+              <div className="px-5 pb-5 space-y-2 border-t border-zinc-700/50 pt-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="flex items-center gap-1.5 text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                    <Sparkles className="w-3.5 h-3.5 text-violet-400" />
+                    Tags
+                  </h4>
+                  <button
+                    onClick={() => setEditingTags(true)}
+                    className="text-xs text-zinc-500 hover:text-violet-400 transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedTags.map((t) => (
+                    <TagChip key={t} tag={t} size="md" />
+                  ))}
+                </div>
+                <p className="text-zinc-600 text-xs">Picked for you — edit if they look off.</p>
+              </div>
+            ) : (
             <div className="px-5 pb-5 space-y-4 border-t border-zinc-700/50 pt-4">
-              {tagsAutoFilled && (
-                <p className="flex items-center gap-1.5 text-xs text-violet-400/80">
-                  <Sparkles className="w-3 h-3 flex-shrink-0" />
-                  AI-suggested — tap to change any of these
-                </p>
-              )}
               {(["mood", "type"] as const).map((cat) => (
                 <div key={cat}>
                   <h4 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-2">
@@ -595,6 +644,7 @@ export default function SearchNominate({
                 </div>
               </div>
             </div>
+            )}
 
             {/* Synopsis section */}
             <div className="px-5 pb-5 space-y-3">

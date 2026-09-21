@@ -6,6 +6,7 @@ import type { Nomination } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
 import TagChip from "./TagChip";
+import StarRating from "./StarRating";
 
 interface NominationListProps {
   nominations: Nomination[];
@@ -73,11 +74,14 @@ export default function NominationList({
                 />
               )}
             </div>
-            <p className="text-zinc-400 text-sm">
-              {nom.year}
-              {nom.author ? ` · ${nom.author}` : ""}
-              {nom.pages ? ` · ${nom.pages} pages` : ""}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-zinc-400 text-sm">
+                {nom.year}
+                {nom.author ? ` · ${nom.author}` : ""}
+                {nom.pages ? ` · ${nom.pages} pages` : ""}
+              </p>
+              <StarRating rating={nom.rating} ratingCount={nom.rating_count} />
+            </div>
             {nom.tags?.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {nom.tags.map((t) => (

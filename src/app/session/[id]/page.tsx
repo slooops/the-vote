@@ -15,7 +15,7 @@ import {
   generateToken,
   markWelcomeSeen,
 } from "@/lib/user";
-import type { Session, Nomination, Vote, RankedResult, IRVRound } from "@/lib/types";
+import type { Session, Nomination, Vote, RankedResult, IRVRound, FinalTie } from "@/lib/types";
 
 export default function SessionPage({
   params,
@@ -31,6 +31,7 @@ export default function SessionPage({
   const [totalVotes, setTotalVotes] = useState(0);
   const [exhaustedFinal, setExhaustedFinal] = useState(0);
   const [resultsHidden, setResultsHidden] = useState(false);
+  const [finalTie, setFinalTie] = useState<FinalTie | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userToken, setUserToken] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export default function SessionPage({
       setTotalVotes(data.total_votes);
       setExhaustedFinal(data.exhausted_final);
       setResultsHidden(!!data.hidden);
+      setFinalTie(data.final_tie ?? null);
     }
   }, [id]);
 
@@ -378,6 +380,7 @@ export default function SessionPage({
                     rounds={rounds}
                     totalVotes={totalVotes}
                     exhaustedFinal={exhaustedFinal}
+                    finalTie={finalTie}
                     onNominationClick={handleNominationClick}
                   />
                 </div>
@@ -393,6 +396,7 @@ export default function SessionPage({
             rounds={rounds}
             totalVotes={totalVotes}
             exhaustedFinal={exhaustedFinal}
+            finalTie={finalTie}
             isFinal
             onNominationClick={handleNominationClick}
           />

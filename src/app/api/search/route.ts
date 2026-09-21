@@ -37,13 +37,26 @@ async function searchMovies(query: string) {
 
   const data = await res.json();
   const results = data.results.slice(0, 8).map(
-    (m: { id: number; title: string; overview: string; poster_path: string | null; release_date: string }) => ({
+    (m: {
+      id: number;
+      title: string;
+      overview: string;
+      poster_path: string | null;
+      release_date: string;
+      vote_average?: number;
+      vote_count?: number;
+    }) => ({
       id: `tmdb-${m.id}`,
       title: m.title,
       year: m.release_date ? m.release_date.slice(0, 4) : "",
       poster_url: m.poster_path ? `${TMDB_IMG}${m.poster_path}` : null,
       synopsis: m.overview || "",
       tmdb_id: m.id,
+      // TMDB scores out of 10; normalize to 5 stars. Already in this response,
+      // so movie ratings cost no extra request.
+      rating: m.vote_count && m.vote_count > 0 ? Math.round((m.vote_average! / 2) * 100) / 100 : null,
+      rating_count: m.vote_count ?? null,
+      rating_source: "tmdb",
     })
   );
 

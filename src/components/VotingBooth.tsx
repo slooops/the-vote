@@ -6,6 +6,7 @@ import { Reorder, motion } from "framer-motion";
 import type { Nomination, Vote } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
+import StarRating from "./StarRating";
 
 interface VotingBoothProps {
   sessionId: string;
@@ -256,10 +257,13 @@ export default function VotingBooth({
                     <p className={`text-sm font-medium truncate ${medal ? medal.text : "text-white"}`}>
                       {nom.title}
                     </p>
-                    <p className="text-zinc-500 text-xs truncate">
-                      {nom.year}
-                      {nom.author ? ` · ${nom.author}` : ""}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-zinc-500 text-xs truncate">
+                        {nom.year}
+                        {nom.author ? ` · ${nom.author}` : ""}
+                      </p>
+                      <StarRating rating={nom.rating} ratingCount={nom.rating_count} />
+                    </div>
                   </div>
 
                   {onNominationClick && (
@@ -315,10 +319,13 @@ export default function VotingBooth({
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate text-zinc-400">{nom.title}</p>
-                  <p className="text-zinc-600 text-xs truncate">
-                    {nom.year}
-                    {nom.author ? ` · ${nom.author}` : ""}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-zinc-600 text-xs truncate">
+                      {nom.year}
+                      {nom.author ? ` · ${nom.author}` : ""}
+                    </p>
+                    <StarRating rating={nom.rating} ratingCount={nom.rating_count} />
+                  </div>
                 </div>
                 {sessionType === "movie" && nom.availability && (
                   <AvailabilityBadge

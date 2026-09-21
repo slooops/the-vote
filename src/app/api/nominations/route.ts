@@ -21,6 +21,9 @@ export async function POST(req: NextRequest) {
     streaming_rent,
     availability,
     tags,
+    rating,
+    rating_count,
+    rating_source,
     voter_token,
     voter_name,
   } = body;
@@ -66,8 +69,8 @@ export async function POST(req: NextRequest) {
 
   const id = nanoid(10);
   await sql(
-    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, pages, streaming_availability, streaming_rent, availability, tags, nominated_by_token, nominated_by_name)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+    `INSERT INTO tv_nominations (id, session_id, title, poster_url, synopsis, author, year, tmdb_id, openlibrary_key, pages, streaming_availability, streaming_rent, availability, tags, rating, rating_count, rating_source, nominated_by_token, nominated_by_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
     [
       id, session_id, title, poster_url || null, synopsis || null,
       author || null, year || null, tmdb_id || null, openlibrary_key || null,
@@ -76,6 +79,9 @@ export async function POST(req: NextRequest) {
       JSON.stringify(streaming_rent || []),
       availability || "unavailable",
       JSON.stringify(tags),
+      typeof rating === "number" ? rating : null,
+      typeof rating_count === "number" ? rating_count : null,
+      rating_source || null,
       voter_token, voter_name,
     ]
   );

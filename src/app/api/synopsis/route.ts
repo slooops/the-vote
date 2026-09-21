@@ -90,6 +90,30 @@ async function fetchOpenLibraryDescription(openlibraryKey: string): Promise<stri
   }
 }
 
+// Open Library exposes community star ratings per work (already 0-5). Free,
+// no quota, one call - fetched only for a book the user actually selected.
+// Coverage is patchy: plenty of works have zero ratings, so null is normal.
+async function fetchOpenLibraryRating(
+  openlibraryKey: string
+): Promise<{ rating: number | null; rating_count: number | null }> {
+  if (!/^\/works\/[A-Za-z0-9]+$/.test(openlibraryKey)) return { rating: null, rating_count: null };
+  try {
+    const res = await fetch(`https://openlibrary.org${openlibraryKey}/ratings.json`, {
+      headers: { accept: "application/json" },
+    });
+    if (!res.ok) return { rating: null, rating_count: null };
+    const data = await res.json();
+    const avg = data?.summary?.average;
+    const count = data?.summary?.count;
+    if (typeof avg !== "number" || typeof count !== "number" || count < 1) {
+      return { rating: null, rating_count: null };
+    }
+    return { rating: Math.round(avg * 100) / 100, rating_count: count };
+  } catch {
+    return { rating: null, rating_count: null };
+  }
+}
+
 // Classify an already-written synopsis. Used for the Open Library path, where
 // we have a description but never called Gemini - one small request, and only
 // for a title the user has actually selected. Failure is non-fatal: the user
@@ -157,10 +181,31 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Backfill ratings for rows cached before this feature existed.
+      let rating = cached[0].rating !== null ? Number(cached[0].rating) : null;
+      let rating_count = cached[0].rating_count ?? null;
+      if (rating === null && type === "book" && openlibrary_key) {
+        const fetched = await fetchOpenLibraryRating(openlibrary_key);
+        rating = fetched.rating;
+        rating_count = fetched.rating_count;
+        if (rating !== null) {
+          try {
+            await sql(
+              `UPDATE tv_synopsis_cache SET rating = $1, rating_count = $2 WHERE lookup_key = $3`,
+              [rating, rating_count, cacheKey]
+            );
+          } catch {
+            // Non-critical.
+          }
+        }
+      }
+
       return NextResponse.json({
         synopsis: cached[0].synopsis,
         author: cached[0].author,
         tags,
+        rating,
+        rating_count,
         cached: true,
       });
     }
@@ -173,11 +218,12 @@ export async function POST(req: NextRequest) {
     if (olDescription) {
       // OL gave us prose but no tags, so spend one Gemini call to classify it.
       const tags = await generateTagsOnly(title, type, author, olDescription);
+      const { rating, rating_count } = await fetchOpenLibraryRating(openlibrary_key);
       const cacheKey = `${type}:${title}:${author || ""}`.toLowerCase();
       try {
         await sql(
-          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (lookup_key) DO NOTHING`,
-          [nanoid(10), cacheKey, olDescription, author || null, JSON.stringify(tags)]
+          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags, rating, rating_count) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (lookup_key) DO NOTHING`,
+          [nanoid(10), cacheKey, olDescription, author || null, JSON.stringify(tags), rating, rating_count]
         );
       } catch {
         // Cache write failure is non-critical
@@ -186,6 +232,8 @@ export async function POST(req: NextRequest) {
         synopsis: olDescription,
         author: author || undefined,
         tags,
+        rating,
+        rating_count,
         source: "openlibrary",
       });
     }
@@ -244,21 +292,26 @@ Respond in JSON format: { "synopsis": "...", "author": "${credit}", "tags": [...
 
     // Drop anything the model invented outside the taxonomy.
     const tags = coerceTags(parsed.tags);
+    // Ratings always come from a real source, never the model.
+    const { rating, rating_count } =
+      type === "book" && openlibrary_key
+        ? await fetchOpenLibraryRating(openlibrary_key)
+        : { rating: null, rating_count: null };
 
     // Cache the result (only for initial generations)
     if (!user_message && parsed.synopsis) {
       const cacheKey = `${type}:${title}:${author || ""}`.toLowerCase();
       try {
         await sql(
-          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (lookup_key) DO NOTHING`,
-          [nanoid(10), cacheKey, parsed.synopsis, parsed.author || null, JSON.stringify(tags)]
+          `INSERT INTO tv_synopsis_cache (id, lookup_key, synopsis, author, tags, rating, rating_count) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (lookup_key) DO NOTHING`,
+          [nanoid(10), cacheKey, parsed.synopsis, parsed.author || null, JSON.stringify(tags), rating, rating_count]
         );
       } catch {
         // Cache write failure is non-critical
       }
     }
 
-    return NextResponse.json({ ...parsed, tags });
+    return NextResponse.json({ ...parsed, tags, rating, rating_count });
   } catch (error) {
     console.error("Gemini error:", error);
     return NextResponse.json(

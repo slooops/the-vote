@@ -1,16 +1,18 @@
 "use client";
 
 import { useMemo, useState, type KeyboardEvent } from "react";
-import { Medal, Award, Crown, ChevronDown } from "lucide-react";
+import { Medal, Award, Crown, ChevronDown, Equal } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { RankedResult, IRVRound } from "@/lib/types";
+import type { RankedResult, IRVRound, FinalTie } from "@/lib/types";
 import Image from "next/image";
+import StarRating from "./StarRating";
 
 interface ResultsChartProps {
   results: RankedResult[];
   rounds: IRVRound[];
   totalVotes: number;
   exhaustedFinal: number;
+  finalTie?: FinalTie | null;
   isFinal?: boolean;
   onNominationClick?: (nomination: RankedResult) => void;
 }
@@ -26,6 +28,7 @@ export default function ResultsChart({
   rounds,
   totalVotes,
   exhaustedFinal,
+  finalTie,
   isFinal,
   onNominationClick,
 }: ResultsChartProps) {
@@ -57,14 +60,33 @@ export default function ResultsChart({
         <span className="text-zinc-500 text-sm">{totalVotes} vote{totalVotes !== 1 ? "s" : ""} cast</span>
       </div>
 
+      {finalTie && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+          <p className="text-amber-300 font-semibold text-sm">
+            No winner — it&apos;s a tie
+          </p>
+          <p className="text-zinc-300 text-xs mt-1">
+            {finalTie.candidates.length} options finished tied on {finalTie.votes}{" "}
+            {finalTie.votes === 1 ? "vote" : "votes"} in round {finalTie.round} with no
+            majority. Rather than let a coin flip decide, the organizer needs to reopen
+            voting or pick between them.
+          </p>
+        </div>
+      )}
+
       {results.map((result, i) => {
         const barWidth = maxVotes > 0 ? (result.first_round_votes / maxVotes) * 100 : 0;
-        const isWinner = totalVotes > 0 && result.rank === 1;
+        // With an unresolved tie there is no winner to crown - several entries
+        // share rank 1 instead.
+        const isTiedFirst = !!finalTie && result.rank === 1;
+        const isWinner = totalVotes > 0 && result.rank === 1 && !finalTie;
         const medal = MEDALS[i];
 
         const caption =
           totalVotes === 0
             ? null
+            : isTiedFirst
+            ? `Tied for first in round ${finalTie!.round}`
             : isWinner
             ? rounds.length === 1
               ? "Instant winner"
@@ -97,6 +119,8 @@ export default function ResultsChart({
             } ${
               isWinner
                 ? "bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30"
+                : isTiedFirst
+                ? "bg-amber-500/5 border border-amber-500/30"
                 : "bg-zinc-800/30 border border-zinc-700/50"
             }`}
           >
@@ -105,6 +129,8 @@ export default function ResultsChart({
               <div className="w-8 text-center flex-shrink-0">
                 {isWinner ? (
                   <Crown className="w-6 h-6 text-yellow-400 mx-auto" />
+                ) : isTiedFirst ? (
+                  <Equal className="w-5 h-5 text-amber-400 mx-auto" />
                 ) : medal ? (
                   <medal.icon className={`w-5 h-5 mx-auto ${medal.text}`} />
                 ) : (
@@ -130,11 +156,14 @@ export default function ResultsChart({
                 <p className={`font-medium truncate ${isWinner ? "text-yellow-200" : "text-white"}`}>
                   {result.title}
                 </p>
-                <p className="text-zinc-500 text-xs">
-                  {result.year}
-                  {result.author ? ` · ${result.author}` : ""}
-                  {result.pages ? ` · ${result.pages} pages` : ""}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-zinc-500 text-xs">
+                    {result.year}
+                    {result.author ? ` · ${result.author}` : ""}
+                    {result.pages ? ` · ${result.pages} pages` : ""}
+                  </p>
+                  <StarRating rating={result.rating} ratingCount={result.rating_count} />
+                </div>
 
                 {/* First-round vote bar */}
                 <div className="mt-2 flex items-center gap-2">

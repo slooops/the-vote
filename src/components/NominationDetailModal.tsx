@@ -7,6 +7,7 @@ import type { Nomination, Session } from "@/lib/types";
 import Image from "next/image";
 import AvailabilityBadge from "./AvailabilityBadge";
 import TagChip from "./TagChip";
+import StarRating from "./StarRating";
 import SearchNominate from "./SearchNominate";
 
 interface NominationDetailModalProps {
@@ -117,6 +118,14 @@ export default function NominationDetailModal({
 
         {/* Content */}
         <div className="p-5 space-y-5">
+          {/* Rating */}
+          <StarRating
+            rating={nomination.rating}
+            ratingCount={nomination.rating_count}
+            size="md"
+            showCount
+          />
+
           {/* Tags */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

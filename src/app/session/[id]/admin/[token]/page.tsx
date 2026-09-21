@@ -658,6 +658,7 @@ export default function AdminPage({
             rounds={rounds}
             totalVotes={totalVotes}
             exhaustedFinal={exhaustedFinal}
+            finalTie={finalTie}
             isFinal={session.status === "voting_closed"}
           />
         )}
