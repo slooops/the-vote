@@ -260,6 +260,37 @@ export default function SearchNominate({
     }
   };
 
+  // Clear everything back to an empty search box. Without this the just-
+  // nominated item stays selected, and because the results list only renders
+  // when nothing is selected, the next search silently goes nowhere.
+  const resetForm = () => {
+    setSelected(null);
+    setQuery("");
+    setResults([]);
+    setSynopsis("");
+    setAuthor("");
+    setChatMessages([]);
+    setChatInput("");
+    setShowChat(false);
+    setEditing(false);
+    setFreeOn([]);
+    setRentOn([]);
+    setAvailability("unavailable");
+    setTagMood(null);
+    setTagType(null);
+    setTagGenres([]);
+    setTagsAutoFilled(false);
+    setEditingTags(false);
+    setRating(null);
+    setRatingCount(null);
+    setRatingSource(null);
+    setManualMode(false);
+    setManualTitle("");
+    setManualAuthor("");
+    setManualYear("");
+    setManualPages("");
+  };
+
   const submitNomination = async () => {
     if (!selected) return;
     setSubmitting(true);
@@ -292,6 +323,7 @@ export default function SearchNominate({
       });
 
       if (res.ok) {
+        resetForm();
         onNominated();
       } else {
         const err = await res.json();
